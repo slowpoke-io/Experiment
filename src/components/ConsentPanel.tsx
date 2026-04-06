@@ -92,6 +92,9 @@ export function ConsentPanel({ prolificId, sharedQuery }: ConsentPanelProps) {
             <p>
               You will complete a series of tasks and questionnaires. Please
               read each item carefully and respond as accurately as possible.
+              Some items will ask about your opinions, experiences, or
+              perceptions. There are no right or wrong answers, so please
+              respond honestly and thoughtfully based on your own views.
             </p>
           </section>
 
@@ -133,7 +136,7 @@ export function ConsentPanel({ prolificId, sharedQuery }: ConsentPanelProps) {
               </p>
             </div>
             <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="mb-4 flex items-start gap-3">
+              <div className="mb-4 flex items-center gap-3">
                 <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 text-amber-700">
                   <svg
                     viewBox="0 0 24 24"
@@ -152,12 +155,12 @@ export function ConsentPanel({ prolificId, sharedQuery }: ConsentPanelProps) {
                 </div>
                 <div className="">
                   <h3 className="text-lg font-semibold text-slate-950">
-                    Performance and attention requirements
+                    Participation Requirements
                   </h3>
-                  <p className="body-copy-compact">
+                  {/* <p className="body-copy-compact">
                     Low-quality or incomplete participation will be returned to
                     Prolific without compensation.
-                  </p>
+                  </p> */}
                 </div>
               </div>
 
@@ -173,7 +176,7 @@ export function ConsentPanel({ prolificId, sharedQuery }: ConsentPanelProps) {
                   <span className="mt-2 h-1.5 w-1.5 rounded-full bg-slate-500" />
                   <span>
                     The study is completed in less than{" "}
-                    <strong>5 minutes</strong> or more than
+                    <strong>5 minutes</strong> or more than{" "}
                     <strong>30 minutes</strong>.
                   </span>
                 </li>
@@ -181,7 +184,7 @@ export function ConsentPanel({ prolificId, sharedQuery }: ConsentPanelProps) {
                   <span className="mt-2 h-1.5 w-1.5 rounded-full bg-slate-500" />
                   <span>
                     Any session is left inactive for more than{" "}
-                    <strong>20 minutes</strong> minutes.
+                    <strong>20 minutes</strong>.
                   </span>
                 </li>
               </ul>
@@ -202,9 +205,9 @@ export function ConsentPanel({ prolificId, sharedQuery }: ConsentPanelProps) {
           <div className="body-copy-compact rounded-xl border border-slate-200 bg-slate-50 p-4">
             By clicking <strong>&quot;I Agree&quot;</strong> below, you confirm
             that you have read and understood the information above, including
-            the performance, attention, and session timeout requirements. You
-            verify that you are at least 18 years old and voluntarily agree to
-            participate in this study under these conditions.
+            the attention, timing, and activity requirements. You verify that
+            you are at least 18 years old and voluntarily agree to participate
+            in this study under these conditions.
           </div>
 
           {errorMessage ? (

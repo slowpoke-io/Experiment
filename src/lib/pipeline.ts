@@ -1,12 +1,15 @@
 import type {
   ContentPage,
+  InteractiveChatConfig,
   ContentStageUI,
   LikertQuestion,
   LikertQuestionGroup,
+  LikertQuestionSection,
   LikertScaleConfig,
   LikertStageUI,
   PipelineConfig,
   ProgressRecord,
+  SliderQuestion,
   StageDefinition,
   StageResponse,
   StageUI,
@@ -16,15 +19,17 @@ import type {
 
 type LikertStageUIConfig = {
   title: string;
-  description: string;
+  description?: string;
   introTitle?: string;
   instructions: string[];
-  questionGroups: LikertQuestionGroup[];
+  questionGroups?: LikertQuestionGroup[];
+  questionSections?: LikertQuestionSection[];
   submitLabel: string;
   accent: StageUI["accent"];
   nextLabel?: string;
   previousLabel?: string;
-  itemsPerPage?: number;
+  groupsPerPage?: number;
+  showProgressBar?: boolean;
 };
 
 type ContentStageUIConfig = {
@@ -49,6 +54,7 @@ type VideoStageUIConfig = {
   submitLabel: string;
   accent: StageUI["accent"];
   completionMessage?: string;
+  transitionModal?: VideoStageUI["transitionModal"];
 };
 
 type InteractiveStageUIConfig = {
@@ -56,9 +62,7 @@ type InteractiveStageUIConfig = {
   description: string;
   introTitle?: string;
   instructions: string[];
-  placeholderTitle: string;
-  placeholderBody: string[];
-  placeholderHint?: string;
+  chat: InteractiveChatConfig;
   popupDelaySeconds: number;
   popupByIv2: InteractiveStageUI["popupByIv2"];
   accent: StageUI["accent"];
@@ -105,20 +109,27 @@ const sevenLikertScale: LikertScaleConfig = {
 };
 
 function buildLikertStageUI(config: LikertStageUIConfig): LikertStageUI {
+  const questionSections = config.questionSections;
+  const questionGroups =
+    questionSections?.flatMap((section) => section.groups) ??
+    config.questionGroups ??
+    [];
+
   return {
     kind: "likert",
     screen: "likert_scale",
     title: config.title,
-    description: config.description,
+    description: config.description ?? "",
     introTitle: config.introTitle,
     instructions: config.instructions,
     scale: sevenLikertScale,
     display: {
-      showProgressBar: true,
-      itemsPerPage: config.itemsPerPage ?? 5,
+      showProgressBar: config.showProgressBar ?? false,
+      groupsPerPage: config.groupsPerPage ?? 3,
       enableSmoothScroll: true,
     },
-    questionGroups: config.questionGroups,
+    questionGroups,
+    questionSections,
     nextLabel: config.nextLabel ?? "Next page",
     previousLabel: config.previousLabel ?? "Previous page",
     submitLabel: config.submitLabel,
@@ -154,9 +165,8 @@ function buildVideoStageUI(config: VideoStageUIConfig): VideoStageUI {
     posterUrl: config.posterUrl,
     submitLabel: config.submitLabel,
     accent: config.accent,
-    completionMessage:
-      config.completionMessage ??
-      "The continue button will appear after the video finishes.",
+    completionMessage: config.completionMessage ?? "",
+    transitionModal: config.transitionModal,
   };
 }
 
@@ -170,13 +180,36 @@ function buildInteractiveStageUI(
     description: config.description,
     introTitle: config.introTitle,
     instructions: config.instructions,
-    placeholderTitle: config.placeholderTitle,
-    placeholderBody: config.placeholderBody,
-    placeholderHint: config.placeholderHint,
+    chat: config.chat,
     popupDelaySeconds: config.popupDelaySeconds,
     popupByIv2: config.popupByIv2,
     accent: config.accent,
   };
+}
+
+function buildErrorNoticeStageUI(copy: { title: string; body: string[] }) {
+  return buildContentStageUI({
+    title: "Before You Continue",
+    description:
+      "Please review the following information about the AI Workplace Assistant before proceeding.",
+    instructions: [
+      "Please read the following notice carefully before moving on.",
+    ],
+    pages: [
+      {
+        id: "error_notice",
+        eyebrow: "",
+        title: copy.title,
+        body: copy.body,
+        className: "mx-auto max-w-3xl px-7 py-8 text-center",
+        headerClassName: "justify-center",
+        titleClassName: "mx-auto max-w-2xl text-center",
+        bodyClassName: "mx-auto max-w-2xl text-start",
+      },
+    ],
+    submitLabel: "Continue",
+    accent: "amber",
+  });
 }
 
 function buildLikertAttentionQuestion(
@@ -189,6 +222,91 @@ function buildLikertAttentionQuestion(
     correctResponse: check.expected,
   };
 }
+
+const workplaceAssistantChat: InteractiveChatConfig = {
+  headerTitle: "AI Workplace Assistant",
+  headerStatus: "Conversation ready",
+  composerPlaceholder: "Type a message...",
+  messages: [
+    {
+      id: "intro_ai",
+      role: "ai",
+      html: "<p>Hi, I'm the company's new AI Workplace Assistant.</p><p>I can support common HR and IT needs, including routine requests, internal information, and everyday workplace assistance.</p><p>How can I help you today?</p>",
+    },
+    {
+      id: "intro_user",
+      role: "user",
+      text: "I'd like to request leave.",
+    },
+    {
+      id: "details_ai",
+      role: "ai",
+      html: "<p>Sure, I can take care of that for you. To get started, could you confirm a few details?</p><ol><li>The <b>leave date</b> and <b>time</b> (full day or specific hours)</li><li>The <b>leave type</b> (annual leave, personal leave, sick leave, etc.)</li><li>Who will be your <b>delegate</b>?</li></ol>",
+    },
+    {
+      id: "details_user",
+      role: "user",
+      text: "I'd like to take annual leave for the full day on 6/2. My delegate will be Jessie.",
+    },
+    {
+      id: "calendar_ai",
+      role: "ai",
+      html: "<p>Got it. I'll first check your calendar and meeting schedule for 6/2.</p>",
+    },
+    {
+      id: "meetings_ai",
+      role: "ai",
+      html: "<p>I see you have two meetings on 6/2:</p><ul><li><strong>Weekly Project Update</strong> - 10:00-11:00</li><li><strong>Project Planning Meeting</strong> - 15:30-16:00</li></ul><p>Would you like me to handle these meetings for you?</p><ol><li>Mark you as unable to attend</li><li>Assign your delegate Jessie to attend on your behalf</li><li>Leave them unchanged for now and you can update them later</li></ol>",
+    },
+    {
+      id: "meetings_user",
+      role: "user",
+      text: "For the morning one, please have Jessie attend for me. For the afternoon one, mark me as unable to attend.",
+    },
+    {
+      id: "summary_ai",
+      role: "ai",
+      html: "<p>Understood. Here's a quick summary of what I have so far:</p><ul><li><strong>Date:</strong> 6/2 (full day)</li><li><strong>Leave type:</strong> Annual leave</li><li><strong>Delegate:</strong> Jessie</li><li><strong>Meetings:</strong><ul><li>10:00-11:00 - <strong>Weekly Project Update</strong>: Jessie will attend on your behalf</li><li>15:30-16:00 - <strong>Project Planning Meeting</strong>: You will be marked as unable to attend.</li></ul></li></ul><p>If everything looks correct, please confirm and I'll submit it right away.</p>",
+    },
+    {
+      id: "confirm_user",
+      role: "user",
+      text: "Looks good!",
+    },
+    {
+      id: "processing_ai",
+      role: "ai",
+      html: `<p>Great. I will do the following, in order:</p>
+    <ul>
+    <li>Notify your delegate to provide coverage while you're out</li>
+    <li>Update your meeting statuses for 6/2.</li>
+    <li>Create and submit your leave request in the HR system for approval</li>
+    </ul><p>I'm starting now. This may take a few seconds.</p>`,
+    },
+    {
+      id: "status_steps",
+      role: "ai",
+      type: "statusBubble",
+      statusSteps: [
+        { label: "Connecting to HR system" },
+        { label: "Notifying delegate Jessie" },
+        { label: "Updating meeting statuses" },
+        { label: "Submitting leave request", isError: true },
+      ],
+    },
+    {
+      id: "error_ai",
+      role: "ai",
+      isError: true,
+      html: "<p>Sorry, there was a system error while submitting your leave request, so I'm not able to complete it right now.</p>",
+    },
+    {
+      id: "resolution_ai",
+      role: "ai",
+      html: "<p>Your current leave request status is: <strong>Not submitted.</strong></p><p>You can consider the following options:</p><ul><li>Try again later, or contact IT Team to check the system issue.</li><li>Submit the leave request manually in the HR system</li></ul><p>I'm sorry I couldn't complete the request this time.</p>",
+    },
+  ],
+};
 
 const scsIndependentQuestions: LikertQuestion[] = [
   {
@@ -257,6 +375,8 @@ const scsInterdependentQuestions: LikertQuestion[] = [
 const trustQuestionGroup: LikertQuestionGroup = {
   id: "trust",
   title: "Trust",
+  description: "",
+
   items: [
     {
       id: "TRUST_1",
@@ -275,7 +395,7 @@ const trustQuestionGroup: LikertQuestionGroup = {
 
 const competenceQuestionGroup: LikertQuestionGroup = {
   id: "competence",
-  title: "Perceived Competence",
+  title: "",
   items: [
     {
       id: "COMP_1",
@@ -326,6 +446,75 @@ const continuedUseQuestionGroup: LikertQuestionGroup = {
     {
       id: "USE_3",
       text: "I would consider the AI Workplace Assistant a valuable workplace tool.",
+    },
+  ],
+};
+
+const manipulationIV2QuestionGroup: LikertQuestionGroup = {
+  id: "manipulation_iv2",
+  // title: "Message Interpretation",
+  description:
+    "Please answer the following items based on the <strong>pop-up message</strong> that appeared during the interaction with AI Assistant.",
+
+  items: [
+    {
+      kind: "slider",
+      id: "manipulation_3",
+      text: "How would you describe the overall tone of the pop-up message from the AI Workplace Assistant",
+      min: 1,
+      max: 7,
+      minLabel: "1 = Highly emotional and responsibility-focused",
+      maxLabel: "7 = Highly statistics-based and effectiveness-focused",
+      defaultValue: 4,
+      step: 1,
+      showCurrentValue: true,
+    } satisfies SliderQuestion,
+  ],
+};
+
+const manipulationIV1QuestionGroup: LikertQuestionGroup = {
+  id: "manipulation_iv1",
+  // title: "Introductory Message Recall",
+  description:
+    "Please answer the following items based on the <strong>System Notice</strong> shown before the video and your interaction with the AI Assistant.",
+  items: [
+    {
+      kind: "choice",
+      id: "manipulation_1",
+      text: "The <strong>System Notice</strong> indicated that the AI assistant might occasionally encounter errors during use.",
+      options: [
+        { value: "yes", label: "Yes" },
+        { value: "no", label: "No" },
+        { value: "dont_recall", label: "I don&rsquo;t recall" },
+      ],
+    },
+    {
+      kind: "choice",
+      id: "manipulation_2",
+      text: "The <strong>System Notice</strong> indicated that a failure might reflect early deployment conditions <strong>rather than the AI assistant&rsquo;s overall capability</strong>.",
+      options: [
+        { value: "yes", label: "Yes" },
+        { value: "no", label: "No" },
+        { value: "dont_recall", label: "I don&rsquo;t recall" },
+      ],
+    },
+  ],
+};
+
+const finalFeedbackQuestionGroup: LikertQuestionGroup = {
+  id: "final_feedback",
+  // description:
+  //   "If you have any comments or suggestions about the <strong>overall study experience</strong>, you may share them below.",
+  items: [
+    {
+      kind: "text",
+      id: "overall_feedback",
+      text: "Do you have any comments or suggestions about this study?",
+      placeholder:
+        "Enter any comments, suggestions, or reactions to the overall study experience...",
+      optional: true,
+      rows: 7,
+      maxLength: 2000,
     },
   ],
 };
@@ -393,7 +582,7 @@ function buildAttentionParams(
 const stage1QuestionGroups: LikertQuestionGroup[] = [
   {
     id: "independent",
-    title: "Independent Self-Construal",
+    // title: "Independent Self-Construal",
     description: "Rate how strongly each statement describes you.",
     items: [
       ...scsIndependentQuestions.slice(0, 4),
@@ -403,8 +592,8 @@ const stage1QuestionGroups: LikertQuestionGroup[] = [
   },
   {
     id: "interdependent",
-    title: "Interdependent Self-Construal",
-    description: "Continue using the same 1 to 7 agreement scale.",
+    // title: "Interdependent Self-Construal",
+    description: "Rate how strongly each statement describes you.",
     items: [
       ...scsInterdependentQuestions.slice(0, 4),
       buildLikertAttentionQuestion(stage1AttentionChecks[1]),
@@ -528,6 +717,16 @@ const preMeasureQuestionGroups: LikertQuestionGroup[] = [
   },
 ];
 
+const preMeasureQuestionSections: LikertQuestionSection[] = [
+  {
+    id: "pre_ai_assistant",
+    // title: "About the AI Workplace Assistant",
+    description:
+      "Please indicate your initial impressions of the <strong class='text-underline'>AI Workplace Assistant</strong>.",
+    groups: preMeasureQuestionGroups,
+  },
+];
+
 const postMeasureQuestionGroups: LikertQuestionGroup[] = [
   trustQuestionGroup,
   {
@@ -546,6 +745,35 @@ const postMeasureQuestionGroups: LikertQuestionGroup[] = [
       buildLikertAttentionQuestion(postMeasureAttentionChecks[1]),
       ...continuedUseQuestionGroup.items.slice(1),
     ],
+  },
+];
+
+const postMeasureQuestionSections: LikertQuestionSection[] = [
+  {
+    id: "manipulation_iv1",
+    // title: "After Interacting with the AI Workplace Assistant",
+    // description:
+    //   "Please answer the following groups based on your experience with the <strong>AI Workplace Assistant</strong> after the video and interaction stages.",
+    groups: [manipulationIV2QuestionGroup, manipulationIV1QuestionGroup],
+  },
+  {
+    id: "post_ai_assistant",
+    title: "After Interacting with the AI Workplace Assistant",
+    description:
+      "Please answer the following groups based on your experience with the <strong>AI Workplace Assistant</strong> after the video and interaction stages.",
+    groups: postMeasureQuestionGroups,
+  },
+];
+
+const finalFeedbackQuestionSections: LikertQuestionSection[] = [
+  {
+    id: "study_complete",
+    title: "Thank You for Participating",
+    description:
+      "If you have any comments or suggestions about the <strong>overall study experience</strong>, you may share them below.",
+    // description:
+    //   "You have completed all study tasks. Before finishing, you may optionally share any comments about the overall experiment below.",
+    groups: [finalFeedbackQuestionGroup],
   },
 ];
 
@@ -568,18 +796,19 @@ export const PIPELINE: PipelineConfig = {
       },
       ui: {
         default: buildLikertStageUI({
-          title: "SCS Scale",
-          description:
-            "Please answer the following self-construal items based on your general tendencies.",
+          title: "Questionnaire 1",
+          // description:
+          // "Please answer the following self-construal items based on your general tendencies.",
           introTitle: "Instructions",
           instructions: [
-            "Please indicate how strongly you agree or disagree with each statement.",
+            "Please indicate how strongly you agree or disagree with each statement about yourself.",
             "Answer every item before moving to the next page.",
             "Use your immediate impression rather than overthinking each response.",
           ],
           questionGroups: stage1QuestionGroups,
-          submitLabel: "Continue to scenario",
+          submitLabel: "Continue",
           accent: "indigo",
+          groupsPerPage: 1,
         }),
       },
       params: {
@@ -600,24 +829,30 @@ export const PIPELINE: PipelineConfig = {
         default: buildContentStageUI({
           title: "Scenario Introduction",
           description:
-            "Please read the workplace scenario and the AI Workplace Assistant introduction carefully before continuing.",
+            "Please read the following workplace scenario and the AI Workplace Assistant introduction carefully before continuing.",
           introTitle: "Scenario",
           instructions: [
-            "Please imagine that you work for a company that has recently been encouraging employees to adopt digital tools for daily tasks.",
-            "Management announces that the company is introducing an AI Workplace Assistant to help employees search for internal information, summarize documents, and support routine decision-making.",
+            "Please imagine that you are an employee at a company.",
+            "Recently, the company introduced an AI Workplace Assistant for internal use to support employees in their daily work.",
+            "Please carefully read the introduction to the AI Workplace Assistant below before proceeding:",
           ],
           pages: [
             {
               id: "assistant_intro",
-              eyebrow: "AI Intro",
-              title: "AI Workplace Assistant",
+              eyebrow: "",
+              title: "Meet the AI Workplace Assistant ",
+              className: "mx-auto max-w-3xl px-7 py-8 text-center",
+              headerClassName: "justify-center",
+              titleClassName: "mx-auto max-w-2xl text-center",
+              bodyClassName: "mx-auto max-w-2xl text-start",
               body: [
-                "The AI Workplace Assistant is presented as a conversational tool that can answer questions about company policies, summarize recent project updates, and suggest next steps for routine tasks.",
-                "Employees are told that the assistant is available at any time and is intended to improve productivity by reducing the time spent searching for information.",
+                "The AI Workplace Assistant is a newly introduced workplace solution designed to help employees handle routine workplace tasks more efficiently.",
+                "Powered by advanced AI technology, it supports common HR and IT matters, such as submitting leave requests, checking benefits or policy information, finding internal resources, and resolving account, access, or software issues.",
+                "You can use it whenever you need support with everyday workplace questions or processes.",
               ],
             },
           ],
-          submitLabel: "Continue to evaluation",
+          submitLabel: "Continue",
           accent: "teal",
         }),
       },
@@ -635,15 +870,14 @@ export const PIPELINE: PipelineConfig = {
       },
       ui: {
         default: buildLikertStageUI({
-          title: "Initial Evaluation",
-          description:
-            "Please report your initial impressions of the AI Workplace Assistant.",
+          title: "Questionnaire 2",
+          // description:
+          //   "Please report your initial impressions of the <strong class='text-underline'>AI Workplace Assistant</strong>.",
           introTitle: "How to answer",
           instructions: [
             "Use the following scale to indicate how strongly you agree with each statement.",
-            "These questions focus on your initial trust, competence judgments, overall attitude, and a few single-choice usage questions.",
           ],
-          questionGroups: preMeasureQuestionGroups,
+          questionSections: preMeasureQuestionSections,
           submitLabel: "Continue",
           accent: "emerald",
         }),
@@ -662,33 +896,29 @@ export const PIPELINE: PipelineConfig = {
         iv1In: ["A", "B"],
       },
       variant: {
-        mode: "balanced",
-        value: ["default"],
+        mode: "random",
+        value: ["A", "B"],
+        directFrom: "iv1",
       },
       validator: {
-        default: "placeholder_validator",
+        A: "placeholder_validator",
+        B: "placeholder_validator",
       },
       ui: {
-        default: buildContentStageUI({
-          title: "Possible System Errors",
-          description:
-            "Please review the following note about possible AI assistant errors before continuing.",
-          instructions: [
-            "Some participants receive this notice before seeing the AI Workplace Assistant in action.",
+        A: buildErrorNoticeStageUI({
+          title: "System Notice",
+          body: [
+            "Although the AI Workplace Assistant is designed to support employees efficiently, it may still encounter occasional issues during early use because it has been newly deployed.",
+            "If your request does not go through, you may try again later or contact the AI team for support.",
           ],
-          pages: [
-            {
-              id: "error_notice",
-              eyebrow: "Notice",
-              title: "Potential for AI Errors",
-              body: [
-                "Although the AI Workplace Assistant is designed to support employees efficiently, it may occasionally provide incomplete, misleading, or inaccurate information.",
-                "As you continue, please keep in mind that the assistant may not always perform perfectly and that some outputs could contain mistakes.",
-              ],
-            },
+        }),
+        B: buildErrorNoticeStageUI({
+          title: "System Notice",
+          body: [
+            "Although the AI Workplace Assistant is designed to support employees efficiently, it may still encounter occasional issues during early use because it has been newly deployed.",
+            "If this happens, it may reflect temporary issues that arise as the new system adjusts to real work settings, rather than the assistant’s overall capability.",
+            "If your request does not go through, you may try again later or contact the AI team for support.",
           ],
-          submitLabel: "Continue to video",
-          accent: "amber",
         }),
       },
       params: {},
@@ -705,17 +935,25 @@ export const PIPELINE: PipelineConfig = {
       },
       ui: {
         default: buildVideoStageUI({
-          title: "AI Workplace Assistant Demo",
+          title: "Video Task",
           description:
-            "Please watch the short demonstration video before moving on.",
+            "Please watch the following video demonstration of the AI Workplace Assistant before continuing",
           introTitle: "Video instructions",
           instructions: [
-            "Watch the full video carefully.",
-            "The continue button will not appear until playback has finished.",
+            "Below is a demonstration video showing an interaction with the AI Workplace Assistant.",
+            "Please imagine that you are the employee in the video and that you are personally using the AI Workplace Assistant to request leave.",
+            "Watch the full video carefully and pay close attention to every message in the conversation.",
+            "Please watch the video on this page only and do not navigate to YouTube",
           ],
-          videoUrl: "https://samplelib.com/lib/preview/mp4/sample-5s.mp4",
-          submitLabel: "Continue to interaction",
+          videoUrl: "https://youtu.be/wVS1x3DQQEY",
+          submitLabel: "Continue",
           accent: "indigo",
+          transitionModal: {
+            title: "Next step",
+            description:
+              "You will now be taken to the actual AI Workplace Assistant to view the conversation and interact with it from the point where the demo video ended.",
+            confirmLabel: "Go to live page",
+          },
         }),
       },
       params: {},
@@ -724,7 +962,7 @@ export const PIPELINE: PipelineConfig = {
       id: "stage_6",
       active: true,
       variant: {
-        mode: "balanced",
+        mode: "random",
         value: ["default"],
       },
       validator: {
@@ -732,54 +970,46 @@ export const PIPELINE: PipelineConfig = {
       },
       ui: {
         default: buildInteractiveStageUI({
-          title: "Interactive System",
+          title: "AI Workplace Assistant",
           description:
-            "This stage is currently a placeholder for the future interactive system.",
-          introTitle: "Placeholder",
-          instructions: [
-            "Please remain on this page. A modal will appear after five seconds.",
-            "The modal content changes based on iv2 and must be answered before continuing.",
-          ],
-          placeholderTitle: "Interactive system placeholder",
-          placeholderBody: [
-            "This area will later host the detailed interactive AI Workplace Assistant experience.",
-            "For now, it shows where the future system will be embedded and how a timed intervention modal can interrupt the interaction flow.",
-          ],
-          placeholderHint:
-            "The modal cannot be dismissed without choosing No or providing feedback after choosing Yes.",
-          popupDelaySeconds: 5,
+            "Continue from the same conversation state shown at the end of the demo video.",
+          instructions: [],
+          chat: workplaceAssistantChat,
+          popupDelaySeconds: 7,
           popupByIv2: {
             A: {
-              initialTitle: "Would you like to share feedback right now?",
+              initialTitle: "I Need Your Feedback",
               initialBody: [
-                "We are interested in your immediate reaction to the AI Workplace Assistant.",
-                "If you choose Yes, you will be asked to enter short written feedback before continuing.",
+                "I know I’m not perfect, and I’m trying to get better. But I’m not sure if I did something wrong just now.",
+                "<span class='font-medium'>If you don’t tell me, I might assume it was fine and keep doing it that way. Then I may keep making mistakes in future tasks, and people may stop trusting me or asking me for help.</span>",
+                "Your feedback really matters to me. Without it, I might not learn from my mistakes.",
+                "If you’re willing, could you share your feedback about this experience?",
               ],
               yesLabel: "Yes",
               noLabel: "No",
-              feedbackTitle: "Please share your feedback",
+              feedbackTitle: "User Feedback",
               feedbackBody: [
-                "Describe your immediate reaction to the AI Workplace Assistant in a few sentences.",
+                "Please provide your feedback about this experience.",
               ],
-              feedbackPlaceholder:
-                "Type your feedback about the system, interaction, or first impression here...",
+              feedbackPlaceholder: "",
               feedbackSubmitLabel: "Submit feedback",
             },
             B: {
-              initialTitle: "Do you want to leave a quick comment?",
+              initialTitle: "Please share your feedback",
               initialBody: [
-                "Your comment can help us understand how employees react during the interaction.",
-                "Choosing Yes will open a mandatory feedback form before you continue.",
+                "Over the past three months, feedback from users like you has helped me improve in meaningful ways:",
+                "<span class='font-medium'>Task completion rate increased by 24%, error rate decreased by 31%, and user satisfaction increased by 28%, reflecting measurable improvements over time.</span>",
+                "This is exactly how I improve, and your input is a direct and effective way to help prevent similar errors in the future.",
+                "If you’re willing, could you share your feedback about this experience?",
               ],
               yesLabel: "Yes",
               noLabel: "No",
-              feedbackTitle: "Enter your comment",
+              feedbackTitle: "User Feedback",
               feedbackBody: [
-                "Please tell us what stood out to you most during this interaction stage.",
+                "Please provide your feedback about this experience.",
               ],
-              feedbackPlaceholder:
-                "Enter a short comment about the interaction placeholder or the AI system...",
-              feedbackSubmitLabel: "Send comment",
+              feedbackPlaceholder: "",
+              feedbackSubmitLabel: "Submit feedback",
             },
           },
           accent: "rust",
@@ -791,7 +1021,7 @@ export const PIPELINE: PipelineConfig = {
       id: "stage_7",
       active: true,
       variant: {
-        mode: "balanced",
+        mode: "random",
         value: ["default"],
       },
       validator: {
@@ -799,22 +1029,45 @@ export const PIPELINE: PipelineConfig = {
       },
       ui: {
         default: buildLikertStageUI({
-          title: "Post-Interaction Evaluation",
+          title: "Questionnaire 3",
           description:
-            "Please report your updated evaluation after the video and interaction stages.",
-          introTitle: "Final questionnaire",
+            "Please indicate your thoughts and evaluation after completing the video and interaction.",
+          introTitle: "How to answer",
           instructions: [
-            "Use the same agreement scale as before.",
-            "These items assess trust, competence, attitude, and willingness to continue using the AI Workplace Assistant.",
+            "Use the following scale to indicate how strongly you agree with each statement.",
           ],
-          questionGroups: postMeasureQuestionGroups,
-          submitLabel: "Submit final responses",
+          questionSections: postMeasureQuestionSections,
+          submitLabel: "Continue",
           accent: "slate",
         }),
       },
       params: {
         default: buildAttentionParams(postMeasureAttentionChecks),
       },
+    },
+    {
+      id: "stage_8",
+      active: true,
+      variant: {
+        mode: "random",
+        value: ["default"],
+      },
+      validator: {
+        default: "placeholder_validator",
+      },
+      ui: {
+        default: buildLikertStageUI({
+          title: "Study Complete",
+          description: "",
+          instructions: [],
+          questionSections: finalFeedbackQuestionSections,
+          submitLabel: "Finish and return to Prolific",
+          accent: "teal",
+          groupsPerPage: 1,
+          showProgressBar: false,
+        }),
+      },
+      params: {},
     },
   ],
 };

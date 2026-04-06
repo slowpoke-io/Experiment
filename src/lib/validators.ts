@@ -62,6 +62,40 @@ function findAnswerValue(answers: JsonObject, key: string) {
     }
   }
 
+  const sliderAnswers = answers.sliderAnswers;
+  if (Array.isArray(sliderAnswers)) {
+    const match = sliderAnswers.find((item) => {
+      return (
+        typeof item === "object" &&
+        item !== null &&
+        "id" in item &&
+        item.id === key &&
+        "response" in item
+      );
+    });
+
+    if (match && typeof match === "object" && match !== null && "response" in match) {
+      return match.response;
+    }
+  }
+
+  const textAnswers = answers.textAnswers;
+  if (Array.isArray(textAnswers)) {
+    const match = textAnswers.find((item) => {
+      return (
+        typeof item === "object" &&
+        item !== null &&
+        "id" in item &&
+        item.id === key &&
+        "response" in item
+      );
+    });
+
+    if (match && typeof match === "object" && match !== null && "response" in match) {
+      return match.response;
+    }
+  }
+
   return undefined;
 }
 

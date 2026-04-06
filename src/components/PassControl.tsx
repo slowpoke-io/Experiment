@@ -83,56 +83,73 @@ export function PassControl({
       </button>
 
       {open ? (
-        <div className="w-[21rem] rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-[0_24px_60px_-30px_rgba(15,23,42,0.4)]">
-          <div className="space-y-1">
-            <div className="text-sm font-semibold text-slate-950">Jump to stage</div>
-            <div className="text-sm leading-6 text-slate-700">
-              Testing helper. This resets progress from the selected stage onward.
+        <>
+          <button
+            type="button"
+            aria-label="Close pass panel"
+            onClick={() => setOpen(false)}
+            className="fixed inset-0 z-0 cursor-default"
+          />
+          <div className="relative z-10 w-[21rem] rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-[0_24px_60px_-30px_rgba(15,23,42,0.4)]">
+            <div className="space-y-1">
+              <div className="text-sm font-semibold text-slate-950">Jump to stage</div>
+              <div className="text-sm leading-6 text-slate-700">
+                Testing helper. This resets progress from the selected stage onward.
+              </div>
             </div>
-          </div>
 
-          <div className="mt-4 space-y-2">
-            {orderedStages.map((stage, index) => {
-              const isCurrent = stage.id === currentStageId;
+            <div className="mt-4 max-h-[min(65vh,32rem)] space-y-2 overflow-y-auto pr-1">
+              {orderedStages.map((stage, index) => {
+                const isCurrent = stage.id === currentStageId;
 
-              return (
-                <button
-                  key={stage.id}
-                  type="button"
-                  onClick={() => void handleJump(stage.id)}
-                  disabled={submitting}
-                  className={[
-                    "w-full rounded-[1.25rem] border px-4 py-3 text-left transition-all",
-                    isCurrent
-                      ? "border-slate-950 bg-slate-950 text-white"
-                      : "border-slate-200 bg-white text-slate-900 hover:border-slate-400 hover:bg-slate-50",
-                  ].join(" ")}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs font-semibold uppercase tracking-[0.14em] opacity-70">
-                      Stage {index + 1}
-                    </span>
-                    {isCurrent ? (
-                      <span className="text-[11px] font-semibold uppercase tracking-[0.14em]">
-                        Current
+                return (
+                  <button
+                    key={stage.id}
+                    type="button"
+                    onClick={() => void handleJump(stage.id)}
+                    disabled={submitting}
+                    className={[
+                      "w-full rounded-[1.25rem] border px-4 py-3 text-left transition-all disabled:cursor-not-allowed",
+                      isCurrent
+                        ? "border-slate-950 bg-slate-950 text-white"
+                        : "border-slate-200 bg-white text-slate-900 hover:border-slate-400 hover:bg-slate-50 disabled:opacity-60",
+                    ].join(" ")}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs font-semibold uppercase tracking-[0.14em] opacity-70">
+                        Stage {index + 1}
                       </span>
-                    ) : null}
-                  </div>
-                  <div className="mt-1 text-sm font-semibold">{stage.id}</div>
-                  <div className={`mt-1 text-sm leading-6 ${isCurrent ? "text-white/80" : "text-slate-700"}`}>
-                    {stage.title}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {errorMessage ? (
-            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {errorMessage}
+                      {isCurrent ? (
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.14em]">
+                          Current
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="mt-1 text-sm font-semibold">{stage.id}</div>
+                    <div
+                      className={`mt-1 text-sm leading-6 ${isCurrent ? "text-white/80" : "text-slate-700"}`}
+                    >
+                      {stage.title}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
-          ) : null}
-        </div>
+
+            {submitting ? (
+              <div className="mt-4 flex items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-700" />
+                <span>Jumping to the selected stage...</span>
+              </div>
+            ) : null}
+
+            {errorMessage ? (
+              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {errorMessage}
+              </div>
+            ) : null}
+          </div>
+        </>
       ) : null}
     </div>
   );

@@ -9,6 +9,10 @@ import { PassControl } from "@/components/PassControl";
 import { RedirectModal } from "@/components/RedirectModal";
 import { StageRenderer } from "@/components/StageRenderer";
 import {
+  buildFailureModalDescription,
+  buildFailureModalNote,
+} from "@/lib/failure-copy";
+import {
   buildSearchString,
   buildConsentPath,
   buildConsentSessionKey,
@@ -35,6 +39,7 @@ type RedirectModalState = {
   open: boolean;
   title: string;
   description: string;
+  note?: string;
   buttonLabel: string;
   redirectUrl: string;
   tone: "success" | "warning";
@@ -63,23 +68,6 @@ function getApiErrorMessage(payload: unknown) {
   }
 
   return null;
-}
-
-function describeFailure(payload: FailedResponse) {
-  const reason = payload.failed_reason;
-  if (!reason) {
-    return "The study could not continue under the quality-control rules for this session.";
-  }
-
-  if (reason.reason === "timeout") {
-    return "This session timed out because it remained inactive beyond the allowed limit. Click the button below to return to Prolific.";
-  }
-
-  if (reason.kind === "attention_checks") {
-    return "At least one required attention-check item was answered incorrectly. Click the button below to return to Prolific.";
-  }
-
-  return "This session did not meet the study requirements. Click the button below to return to Prolific.";
 }
 
 export const getServerSideProps: GetServerSideProps<
@@ -114,6 +102,7 @@ export default function StudyStagePage({
     open: false,
     title: "",
     description: "",
+    note: undefined,
     buttonLabel: "",
     redirectUrl: "",
     tone: "success",
@@ -139,6 +128,7 @@ export default function StudyStagePage({
   const stageExists = requestedStageId
     ? Boolean(findStageById(requestedStageId))
     : false;
+  const isInteractiveStage = stageData?.stage.ui?.kind === "interactive";
 
   const openRedirectModal = useCallback((state: RedirectModalState) => {
     setExperimentState(state.tone === "success" ? "completed" : "failed");
@@ -157,6 +147,7 @@ export default function StudyStagePage({
           title: "Study complete",
           description:
             "You have finished all study stages. Click the button below to return to Prolific and complete your submission.",
+          note: undefined,
           buttonLabel: "Return to Prolific",
           redirectUrl: payload.redirectUrl,
           tone: "success",
@@ -167,8 +158,9 @@ export default function StudyStagePage({
       if (isFailedResponse(payload)) {
         openRedirectModal({
           open: true,
-          title: "Study ended early",
-          description: describeFailure(payload),
+          title: "Study Failed",
+          description: buildFailureModalDescription(),
+          note: buildFailureModalNote(payload.failed_reason),
           buttonLabel: "Return to Prolific",
           redirectUrl: payload.redirectUrl,
           tone: "warning",
@@ -317,9 +309,9 @@ export default function StudyStagePage({
       if (!payload.passed && payload.redirectUrl) {
         openRedirectModal({
           open: true,
-          title: "Study ended early",
-          description:
-            "Your responses did not meet the current study requirements. Click the button below to return to Prolific.",
+          title: "Study Failed",
+          description: buildFailureModalDescription(),
+          note: buildFailureModalNote(payload.verdict),
           buttonLabel: "Return to Prolific",
           redirectUrl: payload.redirectUrl,
           tone: "warning",
@@ -328,15 +320,7 @@ export default function StudyStagePage({
       }
 
       if (payload.completed && payload.redirectUrl) {
-        openRedirectModal({
-          open: true,
-          title: "Study complete",
-          description:
-            "Your final responses have been submitted successfully. Click the button below to return to Prolific.",
-          buttonLabel: "Return to Prolific",
-          redirectUrl: payload.redirectUrl,
-          tone: "success",
-        });
+        window.location.href = payload.redirectUrl;
         return true;
       }
 
@@ -373,7 +357,13 @@ export default function StudyStagePage({
         />
       </Head>
 
-      <div className="mx-auto flex min-h-svh w-full max-w-6xl flex-col gap-8 px-5 py-6 sm:px-8 lg:px-10">
+      <div
+        className={
+          isInteractiveStage
+            ? "relative flex min-h-svh w-full flex-col"
+            : "mx-auto flex min-h-svh w-full max-w-6xl flex-col gap-8 px-5 py-6 sm:px-8 lg:px-10"
+        }
+      >
         {showPassControl && prolificId && requestedStageId ? (
           <PassControl
             prolificId={prolificId}
@@ -440,6 +430,7 @@ export default function StudyStagePage({
         open={modalState.open}
         title={modalState.title}
         description={modalState.description}
+        note={modalState.note}
         buttonLabel={modalState.buttonLabel}
         tone={modalState.tone}
         onConfirm={() => {

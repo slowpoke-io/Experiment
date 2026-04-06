@@ -25,6 +25,7 @@ export type LikertScaleConfig = {
 
 export type LikertDisplayConfig = {
   showProgressBar?: boolean;
+  groupsPerPage?: number;
   itemsPerPage?: number;
   enableSmoothScroll?: boolean;
 };
@@ -45,6 +46,13 @@ export type LikertQuestionGroup = {
   items: SurveyQuestion[];
 };
 
+export type LikertQuestionSection = {
+  id: string;
+  title?: string;
+  description?: string;
+  groups: LikertQuestionGroup[];
+};
+
 export type ChoiceOption = {
   value: string;
   label: string;
@@ -60,7 +68,34 @@ export type ChoiceQuestion = {
   correctResponse?: string;
 };
 
-export type SurveyQuestion = LikertQuestion | ChoiceQuestion;
+export type SliderQuestion = {
+  kind: "slider";
+  id: string;
+  text: string;
+  min: number;
+  max: number;
+  minLabel: string;
+  maxLabel: string;
+  defaultValue?: number;
+  step?: number;
+  showCurrentValue?: boolean;
+};
+
+export type TextQuestion = {
+  kind: "text";
+  id: string;
+  text: string;
+  placeholder?: string;
+  optional?: boolean;
+  rows?: number;
+  maxLength?: number;
+};
+
+export type SurveyQuestion =
+  | LikertQuestion
+  | ChoiceQuestion
+  | SliderQuestion
+  | TextQuestion;
 
 export type ChoiceQuestionGroup = {
   id: string;
@@ -74,6 +109,11 @@ export type ContentPage = {
   eyebrow?: string;
   title: string;
   body: string[];
+  className?: string;
+  headerClassName?: string;
+  titleClassName?: string;
+  bodyClassName?: string;
+  eyebrowClassName?: string;
 };
 
 export type InteractivePopupVariant = {
@@ -85,6 +125,39 @@ export type InteractivePopupVariant = {
   feedbackBody: string[];
   feedbackPlaceholder: string;
   feedbackSubmitLabel: string;
+};
+
+export type InteractiveStatusStep = {
+  label: string;
+  isError?: boolean;
+};
+
+export type InteractiveChatMessage =
+  | {
+      id: string;
+      role: "ai";
+      html: string;
+      isError?: boolean;
+      type?: undefined;
+    }
+  | {
+      id: string;
+      role: "user";
+      text: string;
+      type?: undefined;
+    }
+  | {
+      id: string;
+      role: "ai";
+      type: "statusBubble";
+      statusSteps: InteractiveStatusStep[];
+    };
+
+export type InteractiveChatConfig = {
+  headerTitle: string;
+  headerStatus: string;
+  messages: InteractiveChatMessage[];
+  composerPlaceholder: string;
 };
 
 export type BaseStageUI = {
@@ -103,12 +176,8 @@ export type LikertStageUI = BaseStageUI & {
   screen: "likert_scale";
   scale: LikertScaleConfig;
   display?: LikertDisplayConfig;
-  questionGroups: Array<{
-    id: string;
-    title?: string;
-    description?: string;
-    items: SurveyQuestion[];
-  }>;
+  questionGroups: LikertQuestionGroup[];
+  questionSections?: LikertQuestionSection[];
   nextLabel?: string;
   previousLabel?: string;
 };
@@ -128,14 +197,17 @@ export type VideoStageUI = BaseStageUI & {
   posterUrl?: string;
   nextLabel?: string;
   completionMessage?: string;
+  transitionModal?: {
+    title: string;
+    description: string;
+    confirmLabel: string;
+  };
 };
 
 export type InteractiveStageUI = BaseStageUI & {
   kind: "interactive";
   screen: "interactive_placeholder";
-  placeholderTitle: string;
-  placeholderBody: string[];
-  placeholderHint?: string;
+  chat: InteractiveChatConfig;
   popupDelaySeconds: number;
   popupByIv2: Record<string, InteractivePopupVariant>;
 };
@@ -152,6 +224,7 @@ export type StageVariantConfig = {
   queryKey?: string;
   mode: AssignmentMode;
   value: string[];
+  directFrom?: "iv1" | "iv2";
   stratifyBy?: { column: "iv1" | "iv2" } | { stageVariant: string };
 };
 

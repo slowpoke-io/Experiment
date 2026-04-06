@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 
 import { assignIV, cleanupAbandoned, resolveAllVariants } from "@/lib/assignment";
+import { formatApiError, isUniqueViolation } from "@/lib/api-errors";
 import {
   PIPELINE,
   PROLIFIC_COMPLETE_URL,
@@ -41,6 +42,20 @@ export default async function handler(
     }
 
     const supabase = getSupabaseAdmin();
+    const loadProgress = async () => {
+      const progressResult = await supabase
+        .from("progress")
+        .select("*")
+        .eq("pipeline_code", PIPELINE.code)
+        .eq("prolific_id", prolificId)
+        .maybeSingle();
+
+      if (progressResult.error) {
+        throw progressResult.error;
+      }
+
+      return progressResult.data;
+    };
 
     const participantResult = await supabase
       .from("participants")
@@ -50,21 +65,11 @@ export default async function handler(
       throw participantResult.error;
     }
 
-    const existingProgressResult = await supabase
-      .from("progress")
-      .select("*")
-      .eq("pipeline_code", PIPELINE.code)
-      .eq("prolific_id", prolificId)
-      .maybeSingle();
-
-    if (existingProgressResult.error) {
-      throw existingProgressResult.error;
-    }
-
-    let progress = existingProgressResult.data;
+    let progress = await loadProgress();
 
     if (!progress) {
       const { iv1, iv2 } = await assignIV();
+      const createdAt = nowIso();
 
       const insertResult = await supabase.from("progress").insert({
         pipeline_code: PIPELINE.code,
@@ -75,26 +80,17 @@ export default async function handler(
         completed: false,
         failed: false,
         stage_variants: {},
-        started_at: nowIso(),
-        updated_at: nowIso(),
+        started_at: createdAt,
+        updated_at: createdAt,
       });
 
       if (insertResult.error) {
-        throw insertResult.error;
+        if (!isUniqueViolation(insertResult.error)) {
+          throw insertResult.error;
+        }
       }
 
-      const refreshedResult = await supabase
-        .from("progress")
-        .select("*")
-        .eq("pipeline_code", PIPELINE.code)
-        .eq("prolific_id", prolificId)
-        .single();
-
-      if (refreshedResult.error) {
-        throw refreshedResult.error;
-      }
-
-      progress = refreshedResult.data;
+      progress = await loadProgress();
     }
 
     const typedProgress = progress as ProgressRecord;
@@ -151,7 +147,7 @@ export default async function handler(
     const variantId = stageVariants[stage.id];
     return res.json(buildStageResponse(typedProgress, stage, variantId));
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
+    const message = formatApiError(error);
     return res.status(500).json({ ok: false, message });
   }
 }

@@ -1,12 +1,17 @@
 import { useMemo, useState } from "react";
 
+import { StageInstructions } from "@/components/StageInstructions";
 import { StageCard } from "@/components/StageCard";
 import type {
   ChoiceQuestion,
   LikertQuestion,
+  LikertQuestionGroup,
+  LikertQuestionSection,
   LikertStageUI,
+  SliderQuestion,
   StageResponse,
   SurveyQuestion,
+  TextQuestion,
 } from "@/lib/types";
 
 type LikertSurveyStageProps = {
@@ -20,15 +25,88 @@ type LikertSurveyStageProps = {
 type FlattenedQuestion = SurveyQuestion & {
   groupId: string;
   groupTitle?: string;
+  groupDescription?: string;
 };
 
-function flattenQuestions(ui: LikertStageUI): FlattenedQuestion[] {
-  return ui.questionGroups.flatMap((group) =>
+type DerivedGroup = LikertQuestionGroup & {
+  sectionId?: string;
+  sectionTitle?: string;
+  sectionDescription?: string;
+};
+
+type GroupPage = DerivedGroup[];
+
+function getDerivedGroups(ui: LikertStageUI): DerivedGroup[] {
+  if (ui.questionSections?.length) {
+    return ui.questionSections.flatMap((section: LikertQuestionSection) =>
+      section.groups.map((group) => ({
+        ...group,
+        sectionId: section.id,
+        sectionTitle: section.title,
+        sectionDescription: section.description,
+      })),
+    );
+  }
+
+  return ui.questionGroups.map((group) => ({ ...group }));
+}
+
+function flattenQuestions(groups: DerivedGroup[]): FlattenedQuestion[] {
+  return groups.flatMap((group) =>
     group.items.map((question) => ({
       ...question,
       groupId: group.id,
       groupTitle: group.title,
+      groupDescription: group.description,
     })),
+  );
+}
+
+function buildGroupPages(
+  groups: DerivedGroup[],
+  groupsPerPage: number,
+): GroupPage[] {
+  if (groups.length === 0) {
+    return [];
+  }
+
+  const pages: GroupPage[] = [];
+  let currentPage: GroupPage = [];
+  let currentSectionId: string | undefined;
+
+  for (const group of groups) {
+    const nextSectionId = group.sectionId;
+    const wouldCrossSection =
+      currentPage.length > 0 && currentSectionId !== nextSectionId;
+    const reachedPageLimit = currentPage.length >= groupsPerPage;
+
+    if (wouldCrossSection || reachedPageLimit) {
+      pages.push(currentPage);
+      currentPage = [];
+      currentSectionId = undefined;
+    }
+
+    currentPage.push(group);
+    currentSectionId = nextSectionId;
+  }
+
+  if (currentPage.length > 0) {
+    pages.push(currentPage);
+  }
+
+  return pages;
+}
+
+function buildInitialResponses(questions: FlattenedQuestion[]) {
+  return questions.reduce<Record<string, string | number>>(
+    (accumulator, question) => {
+      if (question.kind === "slider") {
+        accumulator[question.id] = question.defaultValue ?? question.min;
+      }
+
+      return accumulator;
+    },
+    {},
   );
 }
 
@@ -56,9 +134,10 @@ function LikertItem({
           {questionNumber}
         </span>
         <div className="space-y-2">
-          <p className="text-[15px] font-medium leading-7 tracking-[0.01em] text-slate-900 md:text-base">
-            {question.text}
-          </p>
+          <div
+            className="text-[15px] font-medium leading-7 tracking-[0.01em] text-slate-900 md:text-base"
+            dangerouslySetInnerHTML={{ __html: question.text }}
+          />
         </div>
       </div>
 
@@ -135,14 +214,15 @@ function ChoiceItem({
 }: ChoiceItemProps) {
   return (
     <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="mb-5 flex items-start gap-3">
+      <div className="mb-5 flex items-center gap-3">
         <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-sm font-semibold text-slate-700">
           {questionNumber}
         </span>
         <div className="space-y-2">
-          <p className="text-[15px] font-medium leading-6 tracking-[0.01em] text-slate-900 md:text-base">
-            {question.text}
-          </p>
+          <div
+            className="text-[15px] font-medium leading-6 tracking-[0.01em] text-slate-900 md:text-base"
+            dangerouslySetInnerHTML={{ __html: question.text }}
+          />
         </div>
       </div>
 
@@ -187,10 +267,125 @@ function ChoiceItem({
   );
 }
 
+type SliderItemProps = {
+  question: FlattenedQuestion & SliderQuestion;
+  value: number | undefined;
+  questionNumber: number;
+  onChange: (questionId: string, value: number) => void;
+};
+
+function SliderItem({
+  question,
+  value,
+  questionNumber,
+  onChange,
+}: SliderItemProps) {
+  const currentValue = value ?? question.defaultValue ?? question.min;
+
+  return (
+    <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-5 flex items-center gap-3">
+        <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-sm font-semibold text-slate-700">
+          {questionNumber}
+        </span>
+        <div className="space-y-2">
+          <div
+            className="text-[15px] font-medium leading-6 tracking-[0.01em] text-slate-900 md:text-base"
+            dangerouslySetInnerHTML={{ __html: question.text }}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <div className="flex items-center justify-between text-sm font-medium text-slate-600">
+          <span className="max-w-[42%] text-left">{question.minLabel}</span>
+          <span className="max-w-[42%] text-right">{question.maxLabel}</span>
+        </div>
+
+        <input
+          type="range"
+          min={question.min}
+          max={question.max}
+          step={question.step ?? 1}
+          value={currentValue}
+          onChange={(event) =>
+            onChange(question.id, Number(event.currentTarget.value))
+          }
+          className="slider-input h-3 w-full cursor-pointer appearance-none rounded-full bg-slate-200"
+        />
+
+        <div className="flex items-center justify-between text-sm font-semibold text-slate-700">
+          <span>{question.min}</span>
+          {question.showCurrentValue !== false ? (
+            <span className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-indigo-700">
+              {currentValue}
+            </span>
+          ) : null}
+          <span>{question.max}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type TextItemProps = {
+  question: FlattenedQuestion & TextQuestion;
+  value: string | undefined;
+  questionNumber: number;
+  onChange: (questionId: string, value: string) => void;
+};
+
+function TextItem({
+  question,
+  value,
+  questionNumber,
+  onChange,
+}: TextItemProps) {
+  return (
+    <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-5 flex items-start gap-3">
+        <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-sm font-semibold text-slate-700">
+          {questionNumber}
+        </span>
+        <div className="space-y-2">
+          <div
+            className="text-[15px] font-medium leading-6 tracking-[0.01em] text-slate-900 md:text-base"
+            dangerouslySetInnerHTML={{ __html: question.text }}
+          />
+          {question.optional ? (
+            <p className="text-sm text-slate-500">Optional</p>
+          ) : null}
+        </div>
+      </div>
+
+      <textarea
+        rows={question.rows ?? 6}
+        maxLength={question.maxLength}
+        value={value ?? ""}
+        onChange={(event) => onChange(question.id, event.currentTarget.value)}
+        placeholder={question.placeholder}
+        className="min-h-36 w-full rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-3 text-[15px] leading-6 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+      />
+    </div>
+  );
+}
+
 function isChoiceQuestion(
   question: FlattenedQuestion,
 ): question is FlattenedQuestion & ChoiceQuestion {
   return "options" in question && Array.isArray(question.options);
+}
+
+function isSliderQuestion(
+  question: FlattenedQuestion,
+): question is FlattenedQuestion & SliderQuestion {
+  return question.kind === "slider";
+}
+
+function isTextQuestion(
+  question: FlattenedQuestion,
+): question is FlattenedQuestion & TextQuestion {
+  return question.kind === "text";
 }
 
 export function LikertSurveyStage({
@@ -200,25 +395,36 @@ export function LikertSurveyStage({
   errorMessage,
   onSubmit,
 }: LikertSurveyStageProps) {
-  const [currentPage, setCurrentPage] = useState(0);
-  const [responses, setResponses] = useState<Record<string, string | number>>(
-    {},
+  const derivedGroups = useMemo(() => getDerivedGroups(ui), [ui]);
+  const questions = useMemo(
+    () => flattenQuestions(derivedGroups),
+    [derivedGroups],
   );
-
-  const questions = useMemo(() => flattenQuestions(ui), [ui]);
+  const groupsPerPage = ui.display?.groupsPerPage ?? 3;
+  const groupPages = useMemo(
+    () => buildGroupPages(derivedGroups, groupsPerPage),
+    [derivedGroups, groupsPerPage],
+  );
   const scaleValues = useMemo(() => {
     return Array.from(
       { length: ui.scale.max - ui.scale.min + 1 },
       (_, index) => index + ui.scale.min,
     );
   }, [ui.scale.max, ui.scale.min]);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [responses, setResponses] = useState<Record<string, string | number>>(
+    () => buildInitialResponses(questions),
+  );
 
-  const itemsPerPage = ui.display?.itemsPerPage ?? 5;
-  const totalPages = Math.ceil(questions.length / itemsPerPage);
-  const startIndex = currentPage * itemsPerPage;
-  const currentQuestions = questions.slice(
-    startIndex,
-    startIndex + itemsPerPage,
+  const totalPages = groupPages.length;
+  const currentGroups = groupPages[currentPage] ?? [];
+  const currentQuestions = currentGroups.flatMap((group) =>
+    group.items.map((question) => ({
+      ...question,
+      groupId: group.id,
+      groupTitle: group.title,
+      groupDescription: group.description,
+    })),
   );
   const answeredCount = Object.keys(responses).length;
   const progressPercentage =
@@ -229,9 +435,22 @@ export function LikertSurveyStage({
   }
 
   function areCurrentPageAnswersFilled() {
-    return currentQuestions.every(
-      (question) => responses[question.id] !== undefined,
-    );
+    return currentQuestions.every((question) => {
+      if (isSliderQuestion(question)) {
+        return true;
+      }
+
+      if (isTextQuestion(question)) {
+        if (question.optional) {
+          return true;
+        }
+
+        const responseValue = responses[question.id];
+        return typeof responseValue === "string" && responseValue.trim().length > 0;
+      }
+
+      return responses[question.id] !== undefined;
+    });
   }
 
   async function handleNext() {
@@ -252,7 +471,9 @@ export function LikertSurveyStage({
       likertAnswers: questions
         .filter(
           (question): question is FlattenedQuestion & LikertQuestion =>
-            !isChoiceQuestion(question),
+            !isChoiceQuestion(question) &&
+            !isSliderQuestion(question) &&
+            !isTextQuestion(question),
         )
         .map((question) => ({
           id: question.id,
@@ -261,6 +482,20 @@ export function LikertSurveyStage({
       choiceAnswers: questions.filter(isChoiceQuestion).map((question) => ({
         id: question.id,
         response: responses[question.id],
+      })),
+      sliderAnswers: questions.filter(isSliderQuestion).map((question) => ({
+        id: question.id,
+        response:
+          typeof responses[question.id] === "number"
+            ? responses[question.id]
+            : (question.defaultValue ?? question.min),
+      })),
+      textAnswers: questions.filter(isTextQuestion).map((question) => ({
+        id: question.id,
+        response:
+          typeof responses[question.id] === "string"
+            ? responses[question.id]
+            : "",
       })),
     });
   }
@@ -287,17 +522,12 @@ export function LikertSurveyStage({
       ui={ui}
     >
       {ui.introTitle ? (
-        <div className="rounded-[1.75rem] border border-indigo-100 bg-indigo-50/70 p-6">
-          <h3 className="text-xl font-semibold text-slate-950">
-            {ui.introTitle}
-          </h3>
-          <div className="body-copy mt-4 space-y-3">
-            {ui.instructions.map((instruction) => (
-              <p key={instruction}>{instruction}</p>
-            ))}
-          </div>
-
-          <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
+        <StageInstructions
+          title={ui.introTitle}
+          instructions={ui.instructions}
+          tone="indigo"
+        >
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
             <div
               className="grid gap-2 text-center text-sm"
               style={{
@@ -314,7 +544,7 @@ export function LikertSurveyStage({
               ))}
             </div>
           </div>
-        </div>
+        </StageInstructions>
       ) : null}
 
       {ui.display?.showProgressBar !== false ? (
@@ -337,35 +567,117 @@ export function LikertSurveyStage({
       ) : null}
 
       <div className="space-y-5">
-        {currentQuestions.map((question, index) =>
-          isChoiceQuestion(question) ? (
-            <ChoiceItem
-              key={question.id}
-              question={question}
-              value={
-                typeof responses[question.id] === "string"
-                  ? (responses[question.id] as string)
-                  : undefined
-              }
-              questionNumber={startIndex + index + 1}
-              onChange={handleResponseChange}
-            />
-          ) : (
-            <LikertItem
-              key={question.id}
-              question={question}
-              value={
-                typeof responses[question.id] === "number"
-                  ? (responses[question.id] as number)
-                  : undefined
-              }
-              questionNumber={startIndex + index + 1}
-              scaleValues={scaleValues}
-              scaleLabels={ui.scale.labels}
-              onChange={handleResponseChange}
-            />
-          ),
-        )}
+        {currentGroups.map((group) => {
+          const groupStartIndex = questions.findIndex(
+            (question) => question.groupId === group.id,
+          );
+          const flattenedGroupQuestions = group.items.map((question) => ({
+            ...question,
+            groupId: group.id,
+            groupTitle: group.title,
+            groupDescription: group.description,
+          }));
+
+          return (
+            <div key={group.id} className="space-y-3">
+              {group.sectionTitle || group.sectionDescription ? (
+                currentGroups.findIndex(
+                  (candidate) => candidate.sectionId === group.sectionId,
+                ) === currentGroups.indexOf(group) ? (
+                  <div className="rounded-[1.5rem] border border-indigo-100 bg-indigo-50/70 px-5 py-4">
+                    {group.sectionTitle ? (
+                      <h3 className="text-xl font-semibold tracking-tight text-slate-950">
+                        {group.sectionTitle}
+                      </h3>
+                    ) : null}
+                    {group.sectionDescription ? (
+                      <div
+                        className={
+                          group.sectionTitle ? "body-copy mt-2" : "body-copy"
+                        }
+                        dangerouslySetInnerHTML={{
+                          __html: group.sectionDescription,
+                        }}
+                      />
+                    ) : null}
+                  </div>
+                ) : null
+              ) : null}
+
+              {group.title || group.description ? (
+                <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-5 py-4 mt-10">
+                  {group.title ? (
+                    <h3 className="text-lg font-semibold tracking-tight text-slate-950">
+                      {group.title}
+                    </h3>
+                  ) : null}
+                  {group.description ? (
+                    <div
+                      className={group.title ? "body-copy mt-2" : "body-copy"}
+                      dangerouslySetInnerHTML={{
+                        __html: group.description,
+                      }}
+                    />
+                  ) : null}
+                </div>
+              ) : null}
+
+              {flattenedGroupQuestions.map((question, index) =>
+                isChoiceQuestion(question) ? (
+                  <ChoiceItem
+                    key={question.id}
+                    question={question}
+                    value={
+                      typeof responses[question.id] === "string"
+                        ? (responses[question.id] as string)
+                        : undefined
+                    }
+                    questionNumber={groupStartIndex + index + 1}
+                    onChange={handleResponseChange}
+                  />
+                ) : isSliderQuestion(question) ? (
+                  <SliderItem
+                    key={question.id}
+                    question={question}
+                    value={
+                      typeof responses[question.id] === "number"
+                        ? (responses[question.id] as number)
+                        : undefined
+                    }
+                    questionNumber={groupStartIndex + index + 1}
+                    onChange={handleResponseChange}
+                  />
+                ) : isTextQuestion(question) ? (
+                  <TextItem
+                    key={question.id}
+                    question={question}
+                    value={
+                      typeof responses[question.id] === "string"
+                        ? (responses[question.id] as string)
+                        : undefined
+                    }
+                    questionNumber={groupStartIndex + index + 1}
+                    onChange={handleResponseChange}
+                  />
+                ) : (
+                  <LikertItem
+                    key={question.id}
+                    question={question}
+                    value={
+                      typeof responses[question.id] === "number"
+                        ? (responses[question.id] as number)
+                        : undefined
+                    }
+                    questionNumber={groupStartIndex + index + 1}
+                    scaleValues={scaleValues}
+                    scaleLabels={ui.scale.labels}
+                    onChange={handleResponseChange}
+                  />
+                ),
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5">

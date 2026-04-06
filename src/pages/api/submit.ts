@@ -66,7 +66,15 @@ export default async function handler(
     }
 
     if (progress.failed) {
-      return res.status(403).json({ ok: false, message: "locked out (failed)" });
+      return res.json({
+        ok: true,
+        passed: false,
+        completed: false,
+        lockedOut: true,
+        nextStageId: null,
+        redirectUrl: PROLIFIC_FAIL_URL,
+        verdict: progress.failed_reason ?? { reason: "locked_out" },
+      });
     }
 
     const participantStages = getParticipantStages(progress);
@@ -155,15 +163,17 @@ export default async function handler(
     }
 
     if (timedOut) {
+      const timeoutVerdict = {
+        reason: "timeout",
+        cutoff_minutes: ABANDON_TIMEOUT_SECONDS / 60,
+        total_seconds: totalSeconds,
+      } satisfies JsonObject;
+
       const updateResult = await supabase
         .from("progress")
         .update({
           failed: true,
-          failed_reason: {
-            reason: "timeout",
-            cutoff_minutes: ABANDON_TIMEOUT_SECONDS / 60,
-            total_seconds: totalSeconds,
-          },
+          failed_reason: timeoutVerdict,
           updated_at: nowIso(),
         })
         .eq("pipeline_code", PIPELINE.code)
@@ -173,7 +183,15 @@ export default async function handler(
         throw updateResult.error;
       }
 
-      return res.status(403).json({ ok: false, message: "locked out (failed)" });
+      return res.json({
+        ok: true,
+        passed: false,
+        completed: false,
+        lockedOut: true,
+        nextStageId: null,
+        redirectUrl: PROLIFIC_FAIL_URL,
+        verdict: timeoutVerdict,
+      });
     }
 
     if (!passed) {

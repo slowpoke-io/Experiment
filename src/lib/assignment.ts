@@ -146,6 +146,7 @@ async function pickVariant(
   stage: StageDefinition,
   query: Record<string, QueryValue>,
   stratifyBy: StratifyBy,
+  progress: Partial<ProgressRecord>,
 ) {
   const { variant } = stage;
   const allVariants = variant.value;
@@ -162,6 +163,17 @@ async function pickVariant(
 
   if (variantId) {
     return variantId;
+  }
+
+  if (variant.directFrom) {
+    const sourceValue = progress[variant.directFrom];
+    if (typeof sourceValue === "string" && allVariants.includes(sourceValue)) {
+      return sourceValue;
+    }
+
+    throw new Error(
+      `direct variant source ${variant.directFrom} is not available for ${stage.id}`,
+    );
   }
 
   if (variant.mode === "random") {
@@ -206,7 +218,12 @@ export async function resolveAllVariants(
       }
     }
 
-    stageVariants[stage.id] = await pickVariant(stage, query, stratifyBy);
+    stageVariants[stage.id] = await pickVariant(
+      stage,
+      query,
+      stratifyBy,
+      progress,
+    );
   }
 
   const { error } = await supabase

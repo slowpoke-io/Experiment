@@ -3,6 +3,7 @@ type RedirectModalProps = {
   title: string;
   description: string;
   buttonLabel: string;
+  note?: string;
   tone?: "success" | "warning";
   onConfirm: () => void;
 };
@@ -25,6 +26,7 @@ export function RedirectModal({
   title,
   description,
   buttonLabel,
+  note,
   tone = "success",
   onConfirm,
 }: RedirectModalProps) {
@@ -60,13 +62,13 @@ export function RedirectModal({
             </div>
             <p className="body-copy">{description}</p>
           </div>
-          <div
-            className={`rounded-[1.5rem] border px-4 py-3 text-sm leading-6 ${toneClassMap[tone].accent}`}
-          >
-            {tone === "success"
-              ? "Your responses have been recorded. Continue to Prolific to finish the submission flow."
-              : "This session cannot continue. Use the button below to return to Prolific."}
-          </div>
+          {note ? (
+            <div
+              className={`rounded-[1.5rem] border px-4 py-3 text-sm leading-6 ${toneClassMap[tone].accent}`}
+            >
+              {note}
+            </div>
+          ) : null}
         </div>
         <div className="flex justify-end">
           <button

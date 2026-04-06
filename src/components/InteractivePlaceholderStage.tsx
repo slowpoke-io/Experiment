@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { StageCard } from "@/components/StageCard";
+import { AIWorkplaceChat } from "@/components/AIWorkplaceChat";
+import { StageInstructions } from "@/components/StageInstructions";
 import type { InteractiveStageUI, StageResponse } from "@/lib/types";
 
 type InteractivePlaceholderStageProps = {
@@ -69,55 +70,28 @@ export function InteractivePlaceholderStage({
 
   return (
     <>
-      <StageCard
-        stageId={data.stage.id}
-        stageIndex={data.stage.index}
-        totalStages={data.stage.total}
-        variant={data.stage.variant}
-        iv1={data.iv1}
-        iv2={data.iv2}
-        ui={ui}
-    >
-      {ui.introTitle ? (
-        <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-6">
-          <h3 className="text-xl font-semibold text-slate-950">
-            {ui.introTitle}
-          </h3>
-          <div className="body-copy mt-4 space-y-3">
-            {ui.instructions.map((instruction) => (
-              <p key={instruction}>{instruction}</p>
-            ))}
+      <div className="relative h-svh w-full overflow-hidden">
+        {ui.introTitle ? (
+          <div className="absolute left-5 top-5 z-30 w-[min(42rem,calc(100%-2.5rem))]">
+            <StageInstructions
+              title={ui.introTitle}
+              instructions={ui.instructions}
+            />
           </div>
-        </div>
-      ) : null}
-
-        <div className="space-y-4 rounded-[1.75rem] border border-dashed border-slate-300 bg-white p-7 shadow-sm">
-          <span className="eyebrow">Placeholder</span>
-          <h3 className="text-2xl font-semibold tracking-tight text-slate-950">
-            {ui.placeholderTitle}
-          </h3>
-          <div className="body-copy space-y-3.5">
-            {ui.placeholderBody.map((paragraph) => (
-              <p key={paragraph}>{paragraph}</p>
-            ))}
-          </div>
-          {ui.placeholderHint ? (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              {ui.placeholderHint}
-            </div>
-          ) : null}
-        </div>
+        ) : null}
+        <AIWorkplaceChat chat={ui.chat} />
 
         {errorMessage ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="pointer-events-none fixed bottom-5 left-1/2 z-40 w-[min(32rem,calc(100%-2rem))] -translate-x-1/2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-lg">
             {errorMessage}
           </div>
         ) : null}
-      </StageCard>
+      </div>
 
       {modalOpen ? (
-        <div className="modal-backdrop">
-          <div className="modal-card">
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6 pointer-events-none">
+          <div className="absolute inset-0 bg-slate-950/45" />
+          <div className="modal-card pointer-events-auto relative">
             {modalSubmitting ? (
               <div className="flex min-h-56 flex-col items-center justify-center gap-5">
                 <div className="h-12 w-12 animate-spin rounded-full border-[3px] border-slate-300 border-t-slate-950" />
@@ -138,8 +112,11 @@ export function InteractivePlaceholderStage({
                   {popupCopy.initialTitle}
                 </h2>
                 <div className="body-copy space-y-3">
-                  {popupCopy.initialBody.map((paragraph) => (
-                    <p key={paragraph}>{paragraph}</p>
+                  {popupCopy.initialBody.map((paragraph, index) => (
+                    <div
+                      key={`${popupCopy.initialTitle}-${index}`}
+                      dangerouslySetInnerHTML={{ __html: paragraph }}
+                    />
                   ))}
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
@@ -149,7 +126,9 @@ export function InteractivePlaceholderStage({
                     disabled={disabled || modalSubmitting !== null}
                     className="secondary-button w-full sm:w-auto"
                   >
-                    {modalSubmitting === "no" ? "Submitting..." : popupCopy.noLabel}
+                    {modalSubmitting === "no"
+                      ? "Submitting..."
+                      : popupCopy.noLabel}
                   </button>
                   <button
                     type="button"
@@ -184,7 +163,9 @@ export function InteractivePlaceholderStage({
                   <button
                     type="button"
                     onClick={() => void handleYesSubmit()}
-                    disabled={!feedback.trim() || disabled || modalSubmitting !== null}
+                    disabled={
+                      !feedback.trim() || disabled || modalSubmitting !== null
+                    }
                     className="primary-button w-full sm:w-auto"
                   >
                     {modalSubmitting === "yes" || disabled
