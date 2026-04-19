@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { StageInstructions } from "@/components/StageInstructions";
 import { StageCard } from "@/components/StageCard";
@@ -20,11 +20,34 @@ export function ContentStage({
   onSubmit,
 }: ContentStageProps) {
   const [currentPage, setCurrentPage] = useState(0);
+  const [secondsRemaining, setSecondsRemaining] = useState(
+    ui.continueDelaySeconds ?? 0,
+  );
   const page = ui.pages[currentPage];
   const totalPages = ui.pages.length;
 
+  useEffect(() => {
+    if (secondsRemaining <= 0) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setSecondsRemaining((previous) => {
+        if (previous <= 1) {
+          window.clearInterval(timer);
+          return 0;
+        }
+
+        return previous - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [secondsRemaining]);
+
   async function handleNext() {
     if (currentPage < totalPages - 1) {
+      setSecondsRemaining(ui.continueDelaySeconds ?? 0);
       setCurrentPage((previous) => previous + 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
@@ -41,6 +64,7 @@ export function ContentStage({
       return;
     }
 
+    setSecondsRemaining(ui.continueDelaySeconds ?? 0);
     setCurrentPage((previous) => previous - 1);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -100,8 +124,11 @@ export function ContentStage({
           </div>
         ) : null}
         <div className={["body-copy space-y-3.5", page.bodyClassName ?? ""].join(" ")}>
-          {page.body.map((paragraph) => (
-            <p key={paragraph}>{paragraph}</p>
+          {page.body.map((paragraph, index) => (
+            <div
+              key={`${page.id}-body-${index}`}
+              dangerouslySetInnerHTML={{ __html: paragraph }}
+            />
           ))}
         </div>
       </div>
@@ -124,14 +151,16 @@ export function ContentStage({
           <button
             type="button"
             onClick={() => void handleNext()}
-            disabled={disabled}
+            disabled={disabled || secondsRemaining > 0}
             className="primary-button w-full sm:w-auto"
           >
             {disabled
               ? "Submitting..."
-              : currentPage === totalPages - 1
-                ? ui.submitLabel ?? "Continue"
-                : `${ui.nextLabel ?? "Next page"} →`}
+              : secondsRemaining > 0
+                ? `Continue in ${secondsRemaining}s`
+                : currentPage === totalPages - 1
+                  ? ui.submitLabel ?? "Continue"
+                  : `${ui.nextLabel ?? "Next page"} →`}
           </button>
         </div>
 

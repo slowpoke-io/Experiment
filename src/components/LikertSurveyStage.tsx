@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { StageInstructions } from "@/components/StageInstructions";
 import { StageCard } from "@/components/StageCard";
@@ -97,17 +97,8 @@ function buildGroupPages(
   return pages;
 }
 
-function buildInitialResponses(questions: FlattenedQuestion[]) {
-  return questions.reduce<Record<string, string | number>>(
-    (accumulator, question) => {
-      if (question.kind === "slider") {
-        accumulator[question.id] = question.defaultValue ?? question.min;
-      }
-
-      return accumulator;
-    },
-    {},
-  );
+function buildInitialResponses() {
+  return {};
 }
 
 type LikertItemProps = {
@@ -280,7 +271,8 @@ function SliderItem({
   questionNumber,
   onChange,
 }: SliderItemProps) {
-  const currentValue = value ?? question.defaultValue ?? question.min;
+  const hasAnswered = value !== undefined;
+  const currentValue = hasAnswered ? value : (question.defaultValue ?? question.min);
 
   return (
     <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
@@ -297,9 +289,15 @@ function SliderItem({
       </div>
 
       <div className="space-y-4">
-        <div className="flex items-center justify-between text-sm font-medium text-slate-600">
-          <span className="max-w-[42%] text-left">{question.minLabel}</span>
-          <span className="max-w-[42%] text-right">{question.maxLabel}</span>
+        <div className="flex items-start justify-between gap-4 text-sm font-medium text-slate-600">
+          <span
+            className="max-w-[42%] text-left"
+            dangerouslySetInnerHTML={{ __html: question.minLabel }}
+          />
+          <span
+            className="max-w-[42%] text-right"
+            dangerouslySetInnerHTML={{ __html: question.maxLabel }}
+          />
         </div>
 
         <input
@@ -308,6 +306,11 @@ function SliderItem({
           max={question.max}
           step={question.step ?? 1}
           value={currentValue}
+          onPointerDown={() => {
+            if (!hasAnswered) {
+              onChange(question.id, currentValue);
+            }
+          }}
           onChange={(event) =>
             onChange(question.id, Number(event.currentTarget.value))
           }
@@ -316,13 +319,19 @@ function SliderItem({
 
         <div className="flex items-center justify-between text-sm font-semibold text-slate-700">
           <span>{question.min}</span>
-          {question.showCurrentValue !== false ? (
+          {question.showCurrentValue !== false && hasAnswered ? (
             <span className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-indigo-700">
               {currentValue}
             </span>
           ) : null}
           <span>{question.max}</span>
         </div>
+
+        {!hasAnswered ? (
+          <p className="text-xs text-slate-500">
+            Please answer by dragging the slider.
+          </p>
+        ) : null}
       </div>
     </div>
   );
@@ -413,7 +422,10 @@ export function LikertSurveyStage({
   }, [ui.scale.max, ui.scale.min]);
   const [currentPage, setCurrentPage] = useState(0);
   const [responses, setResponses] = useState<Record<string, string | number>>(
-    () => buildInitialResponses(questions),
+    () => buildInitialResponses(),
+  );
+  const [secondsRemaining, setSecondsRemaining] = useState(
+    ui.continueDelaySeconds ?? 0,
   );
 
   const totalPages = groupPages.length;
@@ -430,6 +442,25 @@ export function LikertSurveyStage({
   const progressPercentage =
     questions.length === 0 ? 0 : (answeredCount / questions.length) * 100;
 
+  useEffect(() => {
+    if (secondsRemaining <= 0) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setSecondsRemaining((previous) => {
+        if (previous <= 1) {
+          window.clearInterval(timer);
+          return 0;
+        }
+
+        return previous - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [secondsRemaining]);
+
   function handleResponseChange(questionId: string, value: string | number) {
     setResponses((previous) => ({ ...previous, [questionId]: value }));
   }
@@ -437,7 +468,7 @@ export function LikertSurveyStage({
   function areCurrentPageAnswersFilled() {
     return currentQuestions.every((question) => {
       if (isSliderQuestion(question)) {
-        return true;
+        return responses[question.id] !== undefined;
       }
 
       if (isTextQuestion(question)) {
@@ -459,6 +490,7 @@ export function LikertSurveyStage({
     }
 
     if (currentPage < totalPages - 1) {
+      setSecondsRemaining(ui.continueDelaySeconds ?? 0);
       setCurrentPage((previous) => previous + 1);
       if (ui.display?.enableSmoothScroll !== false) {
         setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 0);
@@ -506,6 +538,7 @@ export function LikertSurveyStage({
     }
 
     setCurrentPage((previous) => previous - 1);
+    setSecondsRemaining(ui.continueDelaySeconds ?? 0);
     if (ui.display?.enableSmoothScroll !== false) {
       setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 0);
     }
@@ -704,14 +737,18 @@ export function LikertSurveyStage({
           <button
             type="button"
             onClick={() => void handleNext()}
-            disabled={!areCurrentPageAnswersFilled() || disabled}
+            disabled={
+              !areCurrentPageAnswersFilled() || disabled || secondsRemaining > 0
+            }
             className="primary-button w-full sm:w-auto disabled:cursor-not-allowed disabled:opacity-50"
           >
             {disabled
               ? "Submitting..."
-              : currentPage === totalPages - 1
-                ? (ui.submitLabel ?? "Submit")
-                : `${ui.nextLabel ?? "Next"} →`}
+              : secondsRemaining > 0
+                ? `Continue in ${secondsRemaining}s`
+                : currentPage === totalPages - 1
+                  ? (ui.submitLabel ?? "Submit")
+                  : `${ui.nextLabel ?? "Next"} →`}
           </button>
         </div>
 

@@ -19,7 +19,12 @@ import {
   buildStudyStagePath,
   extractParticipantQuery,
 } from "@/lib/participant-routing";
-import { PIPELINE, STAGES, findStageById, getParticipantStages } from "@/lib/pipeline";
+import {
+  PIPELINE,
+  STAGES,
+  findStageById,
+  getParticipantStages,
+} from "@/lib/pipeline";
 import type {
   ApiErrorResponse,
   ExperimentState,

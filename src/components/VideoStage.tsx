@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import dynamic from "next/dynamic";
 
@@ -32,12 +32,34 @@ export function VideoStage({
 }: VideoStageProps) {
   const [hasEnded, setHasEnded] = useState(false);
   const [showTransitionModal, setShowTransitionModal] = useState(false);
+  const [secondsRemaining, setSecondsRemaining] = useState(
+    ui.continueDelaySeconds ?? 0,
+  );
   const isYouTubeEmbed = useMemo(() => {
     return /(?:youtu\.be|youtube(?:-nocookie)?\.com)/i.test(ui.videoUrl);
   }, [ui.videoUrl]);
 
+  useEffect(() => {
+    if (secondsRemaining <= 0) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setSecondsRemaining((previous) => {
+        if (previous <= 1) {
+          window.clearInterval(timer);
+          return 0;
+        }
+
+        return previous - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [secondsRemaining]);
+
   async function handleContinue() {
-    if (!hasEnded || disabled) {
+    if (!hasEnded || disabled || secondsRemaining > 0) {
       return;
     }
 
@@ -115,10 +137,14 @@ export function VideoStage({
             <button
               type="button"
               onClick={() => void handleContinue()}
-              disabled={!hasEnded || disabled}
+              disabled={!hasEnded || disabled || secondsRemaining > 0}
               className="primary-button w-full sm:w-auto"
             >
-              {disabled ? "Submitting..." : (ui.submitLabel ?? "Continue")}
+              {disabled
+                ? "Submitting..."
+                : secondsRemaining > 0
+                  ? `Continue in ${secondsRemaining}s`
+                  : (ui.submitLabel ?? "Continue")}
             </button>
           </div>
 

@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 import type {
   InteractiveChatConfig,
   InteractiveChatMessage,
@@ -7,26 +9,6 @@ import type {
 type AIWorkplaceChatProps = {
   chat: InteractiveChatConfig;
 };
-
-function BotIcon({ stroke = "#2563eb" }: { stroke?: string }) {
-  return (
-    <svg
-      width="20"
-      height="20"
-      fill="none"
-      stroke={stroke}
-      strokeWidth="1.8"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-    >
-      <rect x="3" y="4" width="18" height="14" rx="2.5" />
-      <circle cx="9" cy="11" r="1.1" fill={stroke} stroke="none" />
-      <circle cx="15" cy="11" r="1.1" fill={stroke} stroke="none" />
-      <path d="M9 14.5c.9 1 5.1 1 6 0" strokeLinecap="round" />
-      <path d="M12 4V2" strokeLinecap="round" />
-    </svg>
-  );
-}
 
 function SendIcon() {
   return (
@@ -116,8 +98,15 @@ function MessageRow({ message }: { message: InteractiveChatMessage }) {
   if (message.type === "statusBubble") {
     return (
       <div className="flex items-start gap-3">
-        <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#dbeafe]">
-          <BotIcon />
+        <div className="-mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center">
+          <Image
+            src="/chat-bot.png"
+            alt="AI assistant"
+            width={40}
+            height={40}
+            className="h-10 w-10 object-contain"
+            priority
+          />
         </div>
         <StatusBubble steps={message.statusSteps} />
       </div>
@@ -130,8 +119,8 @@ function MessageRow({ message }: { message: InteractiveChatMessage }) {
         <div className="max-w-[75%] rounded-[1.15rem] rounded-tr-md bg-[#2563eb] px-4 py-3 text-[15px] leading-6 text-white shadow-sm">
           {message.text}
         </div>
-        <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-600">
-          You
+        <div className="-mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-600">
+          ME
         </div>
       </div>
     );
@@ -139,8 +128,15 @@ function MessageRow({ message }: { message: InteractiveChatMessage }) {
 
   return (
     <div className="flex items-start gap-3">
-      <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#dbeafe]">
-        <BotIcon />
+      <div className="-mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center">
+        <Image
+          src="/chat-bot.png"
+          alt="AI assistant"
+          width={40}
+          height={40}
+          className="h-10 w-10 object-contain"
+          priority
+        />
       </div>
       <div
         className={`max-w-[80%] rounded-[1.15rem] rounded-tl-md border px-4 py-3 text-[15px] leading-6 shadow-sm ${
@@ -169,8 +165,15 @@ export function AIWorkplaceChat({ chat }: AIWorkplaceChatProps) {
     <div className="flex h-svh w-full flex-col overflow-hidden bg-white">
       <div className="shrink-0 border-b border-slate-200 bg-white px-5 py-4 sm:px-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[rgb(37,99,235)] shadow-sm">
-            <BotIcon stroke="#dbeafe" />
+          <div className="flex h-12 w-12 items-center justify-center">
+            <Image
+              src="/chat-bot-header.webp"
+              alt="AI assistant"
+              width={48}
+              height={48}
+              className="h-12 w-12 object-contain"
+              priority
+            />
           </div>
           <div>
             <div className="text-[15px] font-semibold text-slate-950">

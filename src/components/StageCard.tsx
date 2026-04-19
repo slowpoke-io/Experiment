@@ -33,19 +33,22 @@ export function StageCard({
   children,
 }: StageCardProps) {
   const toneClass = toneClassMap[ui.accent ?? "amber"];
+  const showDebugChips = process.env.NODE_ENV !== "production";
 
   return (
     <article className="panel space-y-6">
-      <div className="flex flex-wrap gap-2">
-        <span className="chip chip-neutral">
-          Stage {stageIndex + 1} / {totalStages}
-        </span>
-        <span className="chip chip-neutral">Pipeline stage</span>
-        <span className={`chip ${toneClass}`}>{stageId}</span>
-        <span className="chip chip-neutral">Variant {variant}</span>
-        <span className="chip chip-neutral">iv1 {iv1}</span>
-        <span className="chip chip-neutral">iv2 {iv2}</span>
-      </div>
+      {showDebugChips ? (
+        <div className="flex flex-wrap gap-2">
+          <span className="chip chip-neutral">
+            Stage {stageIndex + 1} / {totalStages}
+          </span>
+          <span className="chip chip-neutral">Pipeline stage</span>
+          <span className={`chip ${toneClass}`}>{stageId}</span>
+          <span className="chip chip-neutral">Variant {variant}</span>
+          <span className="chip chip-neutral">iv1 {iv1}</span>
+          <span className="chip chip-neutral">iv2 {iv2}</span>
+        </div>
+      ) : null}
 
       <div className="space-y-3">
         <h2 className="max-w-2xl text-3xl font-semibold tracking-tight text-slate-950">

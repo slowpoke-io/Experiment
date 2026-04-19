@@ -119,12 +119,14 @@ export type ContentPage = {
 export type InteractivePopupVariant = {
   initialTitle: string;
   initialBody: string[];
-  yesLabel: string;
-  noLabel: string;
-  feedbackTitle: string;
-  feedbackBody: string[];
-  feedbackPlaceholder: string;
-  feedbackSubmitLabel: string;
+};
+
+export type InteractiveFeedbackPrompt = {
+  title: string;
+  body: string[];
+  placeholder: string;
+  submitLabel: string;
+  submitDelaySeconds?: number;
 };
 
 export type InteractiveStatusStep = {
@@ -168,6 +170,7 @@ export type BaseStageUI = {
   instructions: string[];
   introTitle?: string;
   submitLabel?: string;
+  continueDelaySeconds?: number;
   accent?: AccentTone;
 };
 
@@ -210,6 +213,7 @@ export type InteractiveStageUI = BaseStageUI & {
   chat: InteractiveChatConfig;
   popupDelaySeconds: number;
   popupByIv2: Record<string, InteractivePopupVariant>;
+  feedbackPrompt: InteractiveFeedbackPrompt;
 };
 
 export type StageUI =

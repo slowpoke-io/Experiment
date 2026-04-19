@@ -30,6 +30,7 @@ type LikertStageUIConfig = {
   previousLabel?: string;
   groupsPerPage?: number;
   showProgressBar?: boolean;
+  continueDelaySeconds?: number;
 };
 
 type ContentStageUIConfig = {
@@ -42,6 +43,7 @@ type ContentStageUIConfig = {
   accent: StageUI["accent"];
   nextLabel?: string;
   previousLabel?: string;
+  continueDelaySeconds?: number;
 };
 
 type VideoStageUIConfig = {
@@ -55,6 +57,7 @@ type VideoStageUIConfig = {
   accent: StageUI["accent"];
   completionMessage?: string;
   transitionModal?: VideoStageUI["transitionModal"];
+  continueDelaySeconds?: number;
 };
 
 type InteractiveStageUIConfig = {
@@ -65,6 +68,7 @@ type InteractiveStageUIConfig = {
   chat: InteractiveChatConfig;
   popupDelaySeconds: number;
   popupByIv2: InteractiveStageUI["popupByIv2"];
+  feedbackPrompt: InteractiveStageUI["feedbackPrompt"];
   accent: StageUI["accent"];
 };
 
@@ -133,6 +137,7 @@ function buildLikertStageUI(config: LikertStageUIConfig): LikertStageUI {
     nextLabel: config.nextLabel ?? "Next page",
     previousLabel: config.previousLabel ?? "Previous page",
     submitLabel: config.submitLabel,
+    continueDelaySeconds: config.continueDelaySeconds,
     accent: config.accent,
   };
 }
@@ -147,6 +152,7 @@ function buildContentStageUI(config: ContentStageUIConfig): ContentStageUI {
     instructions: config.instructions,
     pages: config.pages,
     submitLabel: config.submitLabel,
+    continueDelaySeconds: config.continueDelaySeconds,
     accent: config.accent,
     nextLabel: config.nextLabel ?? "Next page",
     previousLabel: config.previousLabel ?? "Previous page",
@@ -164,6 +170,7 @@ function buildVideoStageUI(config: VideoStageUIConfig): VideoStageUI {
     videoUrl: config.videoUrl,
     posterUrl: config.posterUrl,
     submitLabel: config.submitLabel,
+    continueDelaySeconds: config.continueDelaySeconds,
     accent: config.accent,
     completionMessage: config.completionMessage ?? "",
     transitionModal: config.transitionModal,
@@ -183,6 +190,7 @@ function buildInteractiveStageUI(
     chat: config.chat,
     popupDelaySeconds: config.popupDelaySeconds,
     popupByIv2: config.popupByIv2,
+    feedbackPrompt: config.feedbackPrompt,
     accent: config.accent,
   };
 }
@@ -208,6 +216,7 @@ function buildErrorNoticeStageUI(copy: { title: string; body: string[] }) {
       },
     ],
     submitLabel: "Continue",
+    continueDelaySeconds: 15,
     accent: "amber",
   });
 }
@@ -221,6 +230,74 @@ function buildLikertAttentionQuestion(
     isAttentionCheck: true,
     correctResponse: check.expected,
   };
+}
+
+function createSeededRandom(seed: string) {
+  let state = 0;
+
+  for (let index = 0; index < seed.length; index += 1) {
+    state = (state * 31 + seed.charCodeAt(index)) >>> 0;
+  }
+
+  if (state === 0) {
+    state = 0x6d2b79f5;
+  }
+
+  return function nextRandom() {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function seededShuffle<T>(items: T[], seed: string) {
+  const result = [...items];
+  const random = createSeededRandom(seed);
+
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(random() * (index + 1));
+    [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
+  }
+
+  return result;
+}
+
+function insertItemsAtFixedPositions<T>(
+  items: T[],
+  insertions: Array<{ item: T; position: number }>,
+) {
+  const result = [...items];
+
+  for (const insertion of [...insertions].sort(
+    (left, right) => left.position - right.position,
+  )) {
+    const insertIndex = Math.max(
+      0,
+      Math.min(result.length, insertion.position - 1),
+    );
+    result.splice(insertIndex, 0, insertion.item);
+  }
+
+  return result;
+}
+
+function chunkQuestionItems(
+  items: LikertQuestion[],
+  chunkSize: number,
+  idPrefix: string,
+): LikertQuestionGroup[] {
+  const groups: LikertQuestionGroup[] = [];
+
+  for (let index = 0; index < items.length; index += chunkSize) {
+    groups.push({
+      id: `${idPrefix}_${groups.length + 1}`,
+      items: items.slice(index, index + chunkSize),
+    });
+  }
+
+  return groups;
 }
 
 const workplaceAssistantChat: InteractiveChatConfig = {
@@ -276,7 +353,7 @@ const workplaceAssistantChat: InteractiveChatConfig = {
     {
       id: "processing_ai",
       role: "ai",
-      html: `<p>Great. I will do the following, in order:</p>
+      html: `<p>Great. I will do the following in order:</p>
     <ul>
     <li>Notify your delegate to provide coverage while you're out</li>
     <li>Update your meeting statuses for 6/2.</li>
@@ -453,8 +530,8 @@ const continuedUseQuestionGroup: LikertQuestionGroup = {
 const manipulationIV2QuestionGroup: LikertQuestionGroup = {
   id: "manipulation_iv2",
   // title: "Message Interpretation",
-  description:
-    "Please answer the following items based on the <strong>pop-up message</strong> that appeared during the interaction with AI Assistant.",
+  // description:
+  //   "Please answer the following items based on the <strong>pop-up message</strong> that appeared during the interaction with AI Assistant.",
 
   items: [
     {
@@ -462,10 +539,11 @@ const manipulationIV2QuestionGroup: LikertQuestionGroup = {
       id: "manipulation_3",
       text: "How would you describe the overall tone of the pop-up message from the AI Workplace Assistant",
       min: 1,
-      max: 7,
-      minLabel: "1 = Highly emotional and responsibility-focused",
-      maxLabel: "7 = Highly statistics-based and effectiveness-focused",
-      defaultValue: 4,
+      max: 6,
+      minLabel:
+        "1 = Highly emotional and responsibility-focused<br /><span class='text-xs font-normal text-slate-500'>(e.g., implying that people may stop turning to the AI for help without feedback)</span>",
+      maxLabel:
+        "6 = Highly statistics-based and effectiveness-focused<br /><span class='text-xs font-normal text-slate-500'>(e.g., mentioning numerical improvements such as higher completion rates and fewer errors)</span>",
       step: 1,
       showCurrentValue: true,
     } satisfies SliderQuestion,
@@ -476,7 +554,7 @@ const manipulationIV1QuestionGroup: LikertQuestionGroup = {
   id: "manipulation_iv1",
   // title: "Introductory Message Recall",
   description:
-    "Please answer the following items based on the <strong>System Notice</strong> shown before the video and your interaction with the AI Assistant.",
+    "Please answer the following items based on the <strong>System Notice</strong> shown before the video and interaction.",
   items: [
     {
       kind: "choice",
@@ -501,11 +579,65 @@ const manipulationIV1QuestionGroup: LikertQuestionGroup = {
   ],
 };
 
+const responseEfficacyQuestionGroup: LikertQuestionGroup = {
+  id: "response_efficacy",
+  title: "Response-efficacy",
+  items: [
+    {
+      id: "RESP_EFF_1",
+      text: "My feedback works to help the AI assistant improve.",
+    },
+    {
+      id: "RESP_EFF_2",
+      text: "My feedback works in preventing future errors by the AI assistant.",
+    },
+    {
+      id: "RESP_EFF_3",
+      text: "Providing feedback is effective in preventing future failures of the AI assistant.",
+    },
+    {
+      id: "RESP_EFF_4",
+      text: "If I provide feedback, the AI assistant is less likely to make similar errors again.",
+    },
+  ],
+};
+
+const guiltQuestionGroup: LikertQuestionGroup = {
+  id: "guilt",
+  title: "Guilt",
+  items: [
+    {
+      id: "GUILT_1",
+      text: "I would feel guilty if I didn’t provide user feedback to the AI assistant.",
+    },
+    {
+      id: "GUILT_2",
+      text: "I would feel sorry if I didn’t provide feedback to the AI assistant.",
+    },
+    {
+      id: "GUILT_3",
+      text: "I would feel regretful if I didn’t provide feedback to the AI assistant.",
+    },
+    {
+      id: "GUILT_4",
+      text: "I would have a bad conscience if I didn’t provide feedback to the AI assistant.",
+    },
+  ],
+};
+
 const finalFeedbackQuestionGroup: LikertQuestionGroup = {
   id: "final_feedback",
-  // description:
-  //   "If you have any comments or suggestions about the <strong>overall study experience</strong>, you may share them below.",
   items: [
+    {
+      kind: "text",
+      id: "feedback_reason",
+      text: "Please briefly explain why you chose to provide or not provide feedback to the AI assistant earlier.",
+      placeholder:
+        "Enter your reason for providing feedback or leaving the feedback box empty...",
+      optional: true,
+      rows: 5,
+      maxLength: 2000,
+    },
     {
       kind: "text",
       id: "overall_feedback",
@@ -530,6 +662,13 @@ const stage1AttentionChecks: LikertAttentionCheckConfig[] = [
     expected: 2,
     text: 'Quality check: please select "Disagree (2)" for this item.',
   },
+];
+
+const stage1ShuffleSeed = "scs_stage1_seed_v1";
+
+const stage1AttentionInsertions = [
+  { check: stage1AttentionChecks[0], position: 6 },
+  { check: stage1AttentionChecks[1], position: 13 },
 ];
 
 const preMeasureAttentionChecks: LikertAttentionCheckConfig[] = [
@@ -579,28 +718,20 @@ function buildAttentionParams(
   };
 }
 
-const stage1QuestionGroups: LikertQuestionGroup[] = [
-  {
-    id: "independent",
-    // title: "Independent Self-Construal",
-    description: "Rate how strongly each statement describes you.",
-    items: [
-      ...scsIndependentQuestions.slice(0, 4),
-      buildLikertAttentionQuestion(stage1AttentionChecks[0]),
-      ...scsIndependentQuestions.slice(4),
-    ],
-  },
-  {
-    id: "interdependent",
-    // title: "Interdependent Self-Construal",
-    description: "Rate how strongly each statement describes you.",
-    items: [
-      ...scsInterdependentQuestions.slice(0, 4),
-      buildLikertAttentionQuestion(stage1AttentionChecks[1]),
-      ...scsInterdependentQuestions.slice(4),
-    ],
-  },
-];
+const stage1QuestionGroups = chunkQuestionItems(
+  insertItemsAtFixedPositions(
+    seededShuffle(
+      [...scsIndependentQuestions, ...scsInterdependentQuestions],
+      stage1ShuffleSeed,
+    ),
+    stage1AttentionInsertions.map(({ check, position }) => ({
+      item: buildLikertAttentionQuestion(check),
+      position,
+    })),
+  ),
+  6,
+  "scs",
+);
 
 const choiceQuestionGroup: LikertQuestionGroup = {
   id: "usage_preferences",
@@ -750,11 +881,22 @@ const postMeasureQuestionGroups: LikertQuestionGroup[] = [
 
 const postMeasureQuestionSections: LikertQuestionSection[] = [
   {
-    id: "manipulation_iv1",
-    // title: "After Interacting with the AI Workplace Assistant",
+    id: "pop_up_message",
+    title: "About the Pop-up Message",
+    description:
+      "Please answer the following items based on the <strong>pop-up message</strong> shown during your interaction with the AI assistant.",
+    groups: [
+      manipulationIV2QuestionGroup,
+      responseEfficacyQuestionGroup,
+      guiltQuestionGroup,
+    ],
+  },
+  {
+    id: "system_notice",
+    title: "About the System Notice",
     // description:
-    //   "Please answer the following groups based on your experience with the <strong>AI Workplace Assistant</strong> after the video and interaction stages.",
-    groups: [manipulationIV2QuestionGroup, manipulationIV1QuestionGroup],
+    //   "Please answer the following items based on the <strong>System Notice</strong> shown before the video and interaction.",
+    groups: [manipulationIV1QuestionGroup],
   },
   {
     id: "post_ai_assistant",
@@ -763,16 +905,11 @@ const postMeasureQuestionSections: LikertQuestionSection[] = [
       "Please answer the following groups based on your experience with the <strong>AI Workplace Assistant</strong> after the video and interaction stages.",
     groups: postMeasureQuestionGroups,
   },
-];
-
-const finalFeedbackQuestionSections: LikertQuestionSection[] = [
   {
     id: "study_complete",
-    title: "Thank You for Participating",
-    description:
-      "If you have any comments or suggestions about the <strong>overall study experience</strong>, you may share them below.",
+    // title: "Thank You for Participating",
     // description:
-    //   "You have completed all study tasks. Before finishing, you may optionally share any comments about the overall experiment below.",
+    //   "If you have any comments or suggestions about the <strong>overall study experience</strong>, you may share them below.",
     groups: [finalFeedbackQuestionGroup],
   },
 ];
@@ -780,7 +917,7 @@ const finalFeedbackQuestionSections: LikertQuestionSection[] = [
 export const PIPELINE: PipelineConfig = {
   code: "study_v1",
   assign: {
-    iv1: { mode: "balanced", values: ["A", "B", "C"] },
+    iv1: { mode: "balanced", values: ["A", "B"] },
     iv2: { mode: "balanced", values: ["A", "B"] },
   },
   stages: [
@@ -832,9 +969,10 @@ export const PIPELINE: PipelineConfig = {
             "Please read the following workplace scenario and the AI Workplace Assistant introduction carefully before continuing.",
           introTitle: "Scenario",
           instructions: [
-            "Please imagine that you are an employee at a company.",
-            "Recently, the company introduced an AI Workplace Assistant for internal use to support employees in their daily work.",
-            "Please carefully read the introduction to the AI Workplace Assistant below before proceeding:",
+            "Please imagine that you are <strong>Morgan Ellis</strong>, an employee at <strong>Asteron Analytics</strong>, a mid-sized technology company.",
+            "Asteron Analytics has recently launched a new internal system called the <strong>AI Workplace Assistant</strong> to help employees manage routine workplace tasks.",
+            "In this study, you will encounter a workplace situation involving AI Workplace Assistant and should <strong>respond from Morgan Ellis's perspective</strong>.",
+            "Please <strong>read the AI Introduction below carefully</strong> and <strong>stay in character throughout the study</strong>.",
           ],
           pages: [
             {
@@ -847,12 +985,14 @@ export const PIPELINE: PipelineConfig = {
               bodyClassName: "mx-auto max-w-2xl text-start",
               body: [
                 "The AI Workplace Assistant is a newly introduced workplace solution designed to help employees handle routine workplace tasks more efficiently.",
-                "Powered by advanced AI technology, it supports common HR and IT matters, such as submitting leave requests, checking benefits or policy information, finding internal resources, and resolving account, access, or software issues.",
+                "Powered by advanced AI technology, it supports common HR and IT matters, such as <strong>submitting leave requests, checking benefits or policy information, finding internal resources, and resolving account, access, or software issues</strong>.",
+                "At this stage, user feedback is needed to help refine and improve the overall system experience.",
                 "You can use it whenever you need support with everyday workplace questions or processes.",
               ],
             },
           ],
           submitLabel: "Continue",
+          continueDelaySeconds: 25,
           accent: "teal",
         }),
       },
@@ -892,9 +1032,6 @@ export const PIPELINE: PipelineConfig = {
     {
       id: "stage_4",
       active: true,
-      eligibility: {
-        iv1In: ["A", "B"],
-      },
       variant: {
         mode: "random",
         value: ["A", "B"],
@@ -916,7 +1053,7 @@ export const PIPELINE: PipelineConfig = {
           title: "System Notice",
           body: [
             "Although the AI Workplace Assistant is designed to support employees efficiently, it may still encounter occasional issues during early use because it has been newly deployed.",
-            "If this happens, it may reflect temporary issues that arise as the new system adjusts to real work settings, rather than the assistant’s overall capability.",
+            "<span class='font-medium'>If this happens, it may reflect temporary issues that arise as the new system adjusts to real work settings, rather than the assistant’s overall capability.</span>",
             "If your request does not go through, you may try again later or contact the AI team for support.",
           ],
         }),
@@ -940,12 +1077,12 @@ export const PIPELINE: PipelineConfig = {
             "Please watch the following video demonstration of the AI Workplace Assistant before continuing",
           introTitle: "Video instructions",
           instructions: [
-            "Below is a demonstration video showing an interaction with the AI Workplace Assistant.",
-            "Please imagine that you are the employee in the video and that you are personally using the AI Workplace Assistant to request leave.",
-            "Watch the full video carefully and pay close attention to every message in the conversation.",
-            "Please watch the video on this page only and do not navigate to YouTube",
+            "Below is a demonstration video showing an interaction with the <strong>AI Workplace Assistant</strong>.",
+            "Please imagine that <strong>you are the employee in the video</strong> and that you are <strong>personally using the AI Workplace Assistant to request leave</strong>.",
+            "Watch the <strong>full video carefully</strong> and pay <strong>close attention to every message in the conversation</strong>.",
+            "Please watch the video <strong>on this page only</strong> and <strong>do not navigate to YouTube</strong>.",
           ],
-          videoUrl: "https://youtu.be/wVS1x3DQQEY",
+          videoUrl: "https://youtu.be/AlTKkxxi9Bo",
           submitLabel: "Continue",
           accent: "indigo",
           transitionModal: {
@@ -976,6 +1113,16 @@ export const PIPELINE: PipelineConfig = {
           instructions: [],
           chat: workplaceAssistantChat,
           popupDelaySeconds: 7,
+          feedbackPrompt: {
+            title: "User Feedback",
+            body: [
+              "Please share your feedback on the AI workplace assistant in terms of <strong>request understanding</strong>, <strong>response quality</strong>, <strong>task completion</strong>, and <strong>areas for improvement</strong>.",
+              "Please share your feedback on the AI workplace assistant in terms of <strong>whether it understood your request</strong>, <strong>the quality of its responses</strong>, <strong>how it handled and completed the task</strong>, and <strong>what could be improved</strong>.",
+            ],
+            placeholder: "optional",
+            submitLabel: "Submit feedback",
+            submitDelaySeconds: 10,
+          },
           popupByIv2: {
             A: {
               initialTitle: "I Need Your Feedback",
@@ -985,14 +1132,6 @@ export const PIPELINE: PipelineConfig = {
                 "Your feedback really matters to me. Without it, I might not learn from my mistakes.",
                 "If you’re willing, could you share your feedback about this experience?",
               ],
-              yesLabel: "Yes",
-              noLabel: "No",
-              feedbackTitle: "User Feedback",
-              feedbackBody: [
-                "Please provide your feedback about this experience.",
-              ],
-              feedbackPlaceholder: "",
-              feedbackSubmitLabel: "Submit feedback",
             },
             B: {
               initialTitle: "Please share your feedback",
@@ -1002,14 +1141,6 @@ export const PIPELINE: PipelineConfig = {
                 "This is exactly how I improve, and your input is a direct and effective way to help prevent similar errors in the future.",
                 "If you’re willing, could you share your feedback about this experience?",
               ],
-              yesLabel: "Yes",
-              noLabel: "No",
-              feedbackTitle: "User Feedback",
-              feedbackBody: [
-                "Please provide your feedback about this experience.",
-              ],
-              feedbackPlaceholder: "",
-              feedbackSubmitLabel: "Submit feedback",
             },
           },
           accent: "rust",
@@ -1037,37 +1168,13 @@ export const PIPELINE: PipelineConfig = {
             "Use the following scale to indicate how strongly you agree with each statement.",
           ],
           questionSections: postMeasureQuestionSections,
-          submitLabel: "Continue",
+          submitLabel: "Finish and return to Prolific",
           accent: "slate",
         }),
       },
       params: {
         default: buildAttentionParams(postMeasureAttentionChecks),
       },
-    },
-    {
-      id: "stage_8",
-      active: true,
-      variant: {
-        mode: "random",
-        value: ["default"],
-      },
-      validator: {
-        default: "placeholder_validator",
-      },
-      ui: {
-        default: buildLikertStageUI({
-          title: "Study Complete",
-          description: "",
-          instructions: [],
-          questionSections: finalFeedbackQuestionSections,
-          submitLabel: "Finish and return to Prolific",
-          accent: "teal",
-          groupsPerPage: 1,
-          showProgressBar: false,
-        }),
-      },
-      params: {},
     },
   ],
 };

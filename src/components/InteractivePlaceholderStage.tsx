@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
+import Image from "next/image";
+
 import { AIWorkplaceChat } from "@/components/AIWorkplaceChat";
 import { StageInstructions } from "@/components/StageInstructions";
 import type { InteractiveStageUI, StageResponse } from "@/lib/types";
@@ -12,6 +14,21 @@ type InteractivePlaceholderStageProps = {
   onSubmit: (answers: Record<string, unknown>) => Promise<boolean>;
 };
 
+function AssistantIcon() {
+  return (
+    <div className="flex h-13 w-13 items-center justify-center">
+      <Image
+        src="/chat-bot-header.webp"
+        alt="AI assistant"
+        className="h-13 w-13 object-contain"
+        width={52}
+        height={52}
+        priority
+      />
+    </div>
+  );
+}
+
 export function InteractivePlaceholderStage({
   data,
   ui,
@@ -20,11 +37,9 @@ export function InteractivePlaceholderStage({
   onSubmit,
 }: InteractivePlaceholderStageProps) {
   const [modalOpen, setModalOpen] = useState(false);
-  const [feedbackMode, setFeedbackMode] = useState(false);
   const [feedback, setFeedback] = useState("");
-  const [modalSubmitting, setModalSubmitting] = useState<"no" | "yes" | null>(
-    null,
-  );
+  const [modalSubmitting, setModalSubmitting] = useState(false);
+  const [submitDelayRemaining, setSubmitDelayRemaining] = useState(0);
 
   const popupCopy = useMemo(() => {
     return ui.popupByIv2[data.iv2] ?? Object.values(ui.popupByIv2)[0];
@@ -32,39 +47,45 @@ export function InteractivePlaceholderStage({
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
+      setSubmitDelayRemaining(ui.feedbackPrompt.submitDelaySeconds ?? 0);
       setModalOpen(true);
     }, ui.popupDelaySeconds * 1000);
 
     return () => window.clearTimeout(timer);
-  }, [ui.popupDelaySeconds]);
+  }, [ui.feedbackPrompt.submitDelaySeconds, ui.popupDelaySeconds]);
 
-  async function handleNo() {
-    setModalSubmitting("no");
-    const ok = await onSubmit({
-      modalDecision: "no",
-      feedback: null,
-      triggeredByIv2: data.iv2,
-    });
-
-    if (!ok) {
-      setModalSubmitting(null);
-    }
-  }
-
-  async function handleYesSubmit() {
-    if (!feedback.trim()) {
+  useEffect(() => {
+    if (!modalOpen || modalSubmitting || submitDelayRemaining <= 0) {
       return;
     }
 
-    setModalSubmitting("yes");
+    const timer = window.setInterval(() => {
+      setSubmitDelayRemaining((previous) => {
+        if (previous <= 1) {
+          window.clearInterval(timer);
+          return 0;
+        }
+
+        return previous - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [modalOpen, modalSubmitting, submitDelayRemaining]);
+
+  async function handleSubmitFeedback() {
+    const trimmedFeedback = feedback.trim();
+    const modalDecision = trimmedFeedback ? "yes" : "no";
+
+    setModalSubmitting(true);
     const ok = await onSubmit({
-      modalDecision: "yes",
-      feedback: feedback.trim(),
+      modalDecision,
+      feedback: trimmedFeedback || null,
       triggeredByIv2: data.iv2,
     });
 
     if (!ok) {
-      setModalSubmitting(null);
+      setModalSubmitting(false);
     }
   }
 
@@ -100,78 +121,67 @@ export function InteractivePlaceholderStage({
                     Submitting
                   </p>
                   <p className="body-copy-compact">
-                    {modalSubmitting === "yes"
+                    {feedback.trim()
                       ? "Sending your feedback and moving to the next stage."
                       : "Recording your response and moving to the next stage."}
                   </p>
                 </div>
               </div>
-            ) : !feedbackMode ? (
-              <>
-                <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
-                  {popupCopy.initialTitle}
-                </h2>
-                <div className="body-copy space-y-3">
-                  {popupCopy.initialBody.map((paragraph, index) => (
-                    <div
-                      key={`${popupCopy.initialTitle}-${index}`}
-                      dangerouslySetInnerHTML={{ __html: paragraph }}
-                    />
-                  ))}
-                </div>
-                <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-                  <button
-                    type="button"
-                    onClick={() => void handleNo()}
-                    disabled={disabled || modalSubmitting !== null}
-                    className="secondary-button w-full sm:w-auto"
-                  >
-                    {modalSubmitting === "no"
-                      ? "Submitting..."
-                      : popupCopy.noLabel}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFeedbackMode(true)}
-                    disabled={disabled || modalSubmitting !== null}
-                    className="primary-button w-full sm:w-auto"
-                  >
-                    {popupCopy.yesLabel}
-                  </button>
-                </div>
-              </>
             ) : (
               <>
-                <div className="space-y-5">
-                  <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
-                    {popupCopy.feedbackTitle}
-                  </h2>
+                <div className="space-y-4 rounded-[1.75rem] border border-slate-200 bg-slate-50 px-5 py-5">
+                  <div className="flex items-center gap-3">
+                    <AssistantIcon />
+                    <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
+                      {popupCopy.initialTitle}
+                    </h2>
+                  </div>
                   <div className="body-copy space-y-3">
-                    {popupCopy.feedbackBody.map((paragraph) => (
-                      <p key={paragraph}>{paragraph}</p>
+                    {popupCopy.initialBody.map((paragraph, index) => (
+                      <div
+                        key={`${popupCopy.initialTitle}-${index}`}
+                        dangerouslySetInnerHTML={{ __html: paragraph }}
+                      />
                     ))}
                   </div>
                 </div>
-                <textarea
-                  className="block min-h-32 w-full rounded-[1.5rem] border border-slate-300 bg-white px-5 py-4 text-base text-slate-900 outline-none transition focus:border-slate-900 focus:ring-4 focus:ring-indigo-200/70"
-                  value={feedback}
-                  onChange={(event) => setFeedback(event.target.value)}
-                  placeholder={popupCopy.feedbackPlaceholder}
-                  disabled={disabled || modalSubmitting !== null}
-                />
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => void handleYesSubmit()}
-                    disabled={
-                      !feedback.trim() || disabled || modalSubmitting !== null
-                    }
-                    className="primary-button w-full sm:w-auto"
-                  >
-                    {modalSubmitting === "yes" || disabled
-                      ? "Submitting..."
-                      : popupCopy.feedbackSubmitLabel}
-                  </button>
+                <div className="space-y-5 rounded-[1.75rem] border border-indigo-100 bg-white px-5 py-5 shadow-sm">
+                  <div className="space-y-3">
+                    <h2 className="text-xl font-semibold tracking-tight text-slate-950">
+                      {ui.feedbackPrompt.title}
+                    </h2>
+                    <div className="body-copy space-y-3">
+                      {ui.feedbackPrompt.body.map((paragraph, index) => (
+                        <div
+                          key={`${ui.feedbackPrompt.title}-${index}`}
+                          dangerouslySetInnerHTML={{ __html: paragraph }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <textarea
+                    className="block min-h-48 w-full rounded-[1.5rem] border border-slate-300 bg-white px-5 py-4 text-base text-slate-900 outline-none transition focus:border-slate-900 focus:ring-4 focus:ring-indigo-200/70"
+                    value={feedback}
+                    onChange={(event) => setFeedback(event.target.value)}
+                    placeholder={ui.feedbackPrompt.placeholder}
+                    disabled={disabled || modalSubmitting}
+                  />
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => void handleSubmitFeedback()}
+                      disabled={
+                        disabled || modalSubmitting || submitDelayRemaining > 0
+                      }
+                      className="primary-button w-full sm:w-auto"
+                    >
+                      {modalSubmitting || disabled
+                        ? "Submitting..."
+                        : submitDelayRemaining > 0
+                          ? `${ui.feedbackPrompt.submitLabel} in ${submitDelayRemaining}s`
+                          : ui.feedbackPrompt.submitLabel}
+                    </button>
+                  </div>
                 </div>
               </>
             )}
