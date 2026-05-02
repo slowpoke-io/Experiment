@@ -14,13 +14,32 @@ import type {
   ProgressRecord,
 } from "@/lib/types";
 
+export type CurrentStageHandlerDeps = {
+  getSupabaseAdmin: typeof getSupabaseAdmin;
+  participantStageAt: typeof participantStageAt;
+  buildStageResponse: typeof buildStageResponse;
+  PIPELINE: typeof PIPELINE;
+  PROLIFIC_COMPLETE_URL: string;
+  PROLIFIC_FAIL_URL: string;
+};
+
+const defaultDeps: CurrentStageHandlerDeps = {
+  getSupabaseAdmin,
+  participantStageAt,
+  buildStageResponse,
+  PIPELINE,
+  PROLIFIC_COMPLETE_URL,
+  PROLIFIC_FAIL_URL,
+};
+
 function getQueryValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
-export default async function handler(
+export async function currentStageHandler(
   req: NextApiRequest,
   res: NextApiResponse<ParticipantApiResponse | ApiErrorResponse>,
+  deps: CurrentStageHandlerDeps = defaultDeps,
 ) {
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
@@ -36,11 +55,11 @@ export default async function handler(
         .json({ ok: false, message: "prolificId required" });
     }
 
-    const supabase = getSupabaseAdmin();
+    const supabase = deps.getSupabaseAdmin();
     const { data, error } = await supabase
       .from("progress")
       .select("*")
-      .eq("pipeline_code", PIPELINE.code)
+      .eq("pipeline_code", deps.PIPELINE.code)
       .eq("prolific_id", prolificId)
       .single();
 
@@ -55,7 +74,7 @@ export default async function handler(
         ok: true,
         prolificId,
         completed: true,
-        redirectUrl: PROLIFIC_COMPLETE_URL,
+        redirectUrl: deps.PROLIFIC_COMPLETE_URL,
       });
     }
 
@@ -66,17 +85,17 @@ export default async function handler(
         failed: true,
         failed_stage_id: progress.failed_stage_id,
         failed_reason: progress.failed_reason,
-        redirectUrl: PROLIFIC_FAIL_URL,
+        redirectUrl: deps.PROLIFIC_FAIL_URL,
       });
     }
 
-    const stage = participantStageAt(progress, progress.current_stage_index);
+    const stage = deps.participantStageAt(progress, progress.current_stage_index);
     if (!stage) {
       return res.json({
         ok: true,
         prolificId,
         completed: true,
-        redirectUrl: PROLIFIC_COMPLETE_URL,
+        redirectUrl: deps.PROLIFIC_COMPLETE_URL,
       });
     }
 
@@ -88,9 +107,16 @@ export default async function handler(
       });
     }
 
-    return res.json(buildStageResponse(progress, stage, variantId));
+    return res.json(deps.buildStageResponse(progress, stage, variantId));
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return res.status(500).json({ ok: false, message });
   }
+}
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse<ParticipantApiResponse | ApiErrorResponse>,
+) {
+  return currentStageHandler(req, res);
 }

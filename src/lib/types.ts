@@ -44,17 +44,19 @@ export type LikertQuestionGroup = {
   title?: string;
   description?: string;
   items: SurveyQuestion[];
+  show?: boolean;
 };
 
 export type LikertQuestionSection = {
   id: string;
   title?: string;
   description?: string;
+  paginate?: boolean;
   groups: LikertQuestionGroup[];
 };
 
 export type ChoiceOption = {
-  value: string;
+  value: string | number;
   label: string;
   hint?: string;
 };
@@ -64,8 +66,11 @@ export type ChoiceQuestion = {
   id: string;
   text: string;
   options: ChoiceOption[];
+  layout?: "default" | "scale";
+  minLabel?: string;
+  maxLabel?: string;
   isAttentionCheck?: boolean;
-  correctResponse?: string;
+  correctResponse?: string | number;
 };
 
 export type SliderQuestion = {
@@ -109,6 +114,7 @@ export type ContentPage = {
   eyebrow?: string;
   title: string;
   body: string[];
+  footerInstructions?: string[];
   className?: string;
   headerClassName?: string;
   titleClassName?: string;
@@ -199,11 +205,13 @@ export type VideoStageUI = BaseStageUI & {
   videoUrl: string;
   posterUrl?: string;
   nextLabel?: string;
+  preCompletionSubmitLabel?: string;
   completionMessage?: string;
   transitionModal?: {
     title: string;
     description: string;
     confirmLabel: string;
+    confirmDelaySeconds?: number;
   };
 };
 
@@ -353,3 +361,97 @@ export type ValidatorFn = (
   answers: JsonObject,
   params?: JsonObject,
 ) => ValidatorResult;
+
+export type AdminStatus = "in_progress" | "failed" | "completed";
+
+export type AdminOverviewRow = {
+  pipeline_code: string;
+  prolific_id: string;
+  iv1: string;
+  iv2: string;
+  status: AdminStatus;
+  completed: boolean;
+  failed: boolean;
+  failed_stage_id: string | null;
+  failed_reason_summary: string | null;
+  current_stage_index: number;
+  stage_variants: JsonObject;
+  submission_count: number;
+  last_submission_stage_id: string | null;
+  last_submission_variant_id: string | null;
+  last_submission_passed: boolean | null;
+  last_submission_stage_seconds: number | null;
+  last_submission_at: string | null;
+  started_at: string;
+  updated_at: string;
+  total_seconds: number | null;
+};
+
+export type AdminDetailRow = {
+  pipeline_code: string;
+  prolific_id: string;
+  iv1: string;
+  iv2: string;
+  status: AdminStatus;
+  completed: boolean;
+  failed: boolean;
+  failed_stage_id: string | null;
+  failed_reason: JsonObject | null;
+  current_stage_index: number;
+  stage_variants: JsonObject;
+  submission_count: number;
+  last_submission_stage_id: string | null;
+  last_submission_variant_id: string | null;
+  last_submission_passed: boolean | null;
+  last_submission_stage_seconds: number | null;
+  last_submission_at: string | null;
+  last_submission_verdict: JsonObject | null;
+  started_at: string;
+  updated_at: string;
+  total_seconds: number | null;
+  questionnaire_answers: JsonObject;
+  submissions_detail: unknown[];
+};
+
+export type AdminStatusBreakdownCell = {
+  iv1: string;
+  iv2: string;
+  count: number;
+};
+
+export type AdminStatusSummary = {
+  status: AdminStatus;
+  total: number;
+  breakdown: AdminStatusBreakdownCell[];
+};
+
+export type AdminDurationStats = {
+  count: number;
+  minSeconds: number | null;
+  maxSeconds: number | null;
+  averageSeconds: number | null;
+};
+
+export type AdminFeedbackContentSummary = {
+  total: number;
+  breakdown: AdminStatusBreakdownCell[];
+};
+
+export type AdminDashboardSummary = {
+  in_progress: AdminStatusSummary;
+  failed: AdminStatusSummary;
+  completed: AdminStatusSummary;
+  completedDuration: AdminDurationStats;
+  completedFeedbackContent: AdminFeedbackContentSummary;
+};
+
+export type AdminDashboardResponse = {
+  ok: true;
+  rows: AdminOverviewRow[];
+  summary: AdminDashboardSummary;
+};
+
+export type AdminParticipantDetailResponse = {
+  ok: true;
+  participant: AdminDetailRow;
+};

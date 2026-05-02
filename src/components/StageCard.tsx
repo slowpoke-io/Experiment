@@ -56,7 +56,7 @@ export function StageCard({
         </h2>
         {ui.description && (
           <div
-            className="body-copy max-w-3xl"
+            className="body-copy max-w-4xl"
             dangerouslySetInnerHTML={{ __html: ui.description }}
           />
         )}

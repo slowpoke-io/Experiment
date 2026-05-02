@@ -1,6 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 
-import { assignIV, cleanupAbandoned, resolveAllVariants } from "@/lib/assignment";
+import {
+  assignIV,
+  cleanupAbandoned,
+  resolveAllVariants,
+} from "@/lib/assignment";
 import { formatApiError, isUniqueViolation } from "@/lib/api-errors";
 import {
   PIPELINE,
@@ -18,9 +22,40 @@ import type {
   ProgressRecord,
 } from "@/lib/types";
 
-export default async function handler(
+export type InitHandlerDeps = {
+  cleanupAbandoned: typeof cleanupAbandoned;
+  getSupabaseAdmin: typeof getSupabaseAdmin;
+  assignIV: typeof assignIV;
+  resolveAllVariants: typeof resolveAllVariants;
+  participantStageAt: typeof participantStageAt;
+  buildStageResponse: typeof buildStageResponse;
+  nowIso: typeof nowIso;
+  formatApiError: typeof formatApiError;
+  isUniqueViolation: typeof isUniqueViolation;
+  PIPELINE: typeof PIPELINE;
+  PROLIFIC_COMPLETE_URL: string;
+  PROLIFIC_FAIL_URL: string;
+};
+
+const defaultDeps: InitHandlerDeps = {
+  cleanupAbandoned,
+  getSupabaseAdmin,
+  assignIV,
+  resolveAllVariants,
+  participantStageAt,
+  buildStageResponse,
+  nowIso,
+  formatApiError,
+  isUniqueViolation,
+  PIPELINE,
+  PROLIFIC_COMPLETE_URL,
+  PROLIFIC_FAIL_URL,
+};
+
+export async function initHandler(
   req: NextApiRequest,
   res: NextApiResponse<ParticipantApiResponse | ApiErrorResponse>,
+  deps: InitHandlerDeps = defaultDeps,
 ) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -28,7 +63,7 @@ export default async function handler(
   }
 
   try {
-    await cleanupAbandoned();
+    await deps.cleanupAbandoned();
 
     const prolificId =
       typeof (req.body as InitRequestBody | undefined)?.prolificId === "string"
@@ -41,12 +76,12 @@ export default async function handler(
         .json({ ok: false, message: "prolificId required" });
     }
 
-    const supabase = getSupabaseAdmin();
+    const supabase = deps.getSupabaseAdmin();
     const loadProgress = async () => {
       const progressResult = await supabase
         .from("progress")
         .select("*")
-        .eq("pipeline_code", PIPELINE.code)
+        .eq("pipeline_code", deps.PIPELINE.code)
         .eq("prolific_id", prolificId)
         .maybeSingle();
 
@@ -68,11 +103,11 @@ export default async function handler(
     let progress = await loadProgress();
 
     if (!progress) {
-      const { iv1, iv2 } = await assignIV();
-      const createdAt = nowIso();
+      const { iv1, iv2 } = await deps.assignIV();
+      const createdAt = deps.nowIso();
 
       const insertResult = await supabase.from("progress").insert({
-        pipeline_code: PIPELINE.code,
+        pipeline_code: deps.PIPELINE.code,
         prolific_id: prolificId,
         iv1,
         iv2,
@@ -100,7 +135,7 @@ export default async function handler(
         ok: true,
         prolificId,
         completed: true,
-        redirectUrl: PROLIFIC_COMPLETE_URL,
+        redirectUrl: deps.PROLIFIC_COMPLETE_URL,
       });
     }
 
@@ -111,11 +146,11 @@ export default async function handler(
         failed: true,
         failed_stage_id: typedProgress.failed_stage_id,
         failed_reason: typedProgress.failed_reason,
-        redirectUrl: PROLIFIC_FAIL_URL,
+        redirectUrl: deps.PROLIFIC_FAIL_URL,
       });
     }
 
-    const stageVariants = await resolveAllVariants(
+    const stageVariants = await deps.resolveAllVariants(
       prolificId,
       typedProgress.stage_variants ?? {},
       req.query,
@@ -124,12 +159,15 @@ export default async function handler(
 
     typedProgress.stage_variants = stageVariants;
 
-    const stage = participantStageAt(typedProgress, typedProgress.current_stage_index);
+    const stage = deps.participantStageAt(
+      typedProgress,
+      typedProgress.current_stage_index,
+    );
     if (!stage) {
       const updateResult = await supabase
         .from("progress")
-        .update({ completed: true, updated_at: nowIso() })
-        .eq("pipeline_code", PIPELINE.code)
+        .update({ completed: true, updated_at: deps.nowIso() })
+        .eq("pipeline_code", deps.PIPELINE.code)
         .eq("prolific_id", prolificId);
 
       if (updateResult.error) {
@@ -140,14 +178,21 @@ export default async function handler(
         ok: true,
         prolificId,
         completed: true,
-        redirectUrl: PROLIFIC_COMPLETE_URL,
+        redirectUrl: deps.PROLIFIC_COMPLETE_URL,
       });
     }
 
     const variantId = stageVariants[stage.id];
-    return res.json(buildStageResponse(typedProgress, stage, variantId));
+    return res.json(deps.buildStageResponse(typedProgress, stage, variantId));
   } catch (error) {
-    const message = formatApiError(error);
+    const message = deps.formatApiError(error);
     return res.status(500).json({ ok: false, message });
   }
+}
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse<ParticipantApiResponse | ApiErrorResponse>,
+) {
+  return initHandler(req, res);
 }

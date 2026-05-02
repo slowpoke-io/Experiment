@@ -83,10 +83,35 @@ body {
 }
 
 .text-underline {
+  --underline-color: rgba(245, 158, 11, 0.9);
   text-decoration-line: underline;
   text-decoration-thickness: 0.14em;
   text-underline-offset: 0.16em;
-  text-decoration-color: rgba(245, 158, 11, 0.9);
+  text-decoration-color: var(--underline-color);
+}
+
+.underline-amber {
+  --underline-color: rgba(245, 158, 11, 0.9);
+}
+
+.underline-indigo {
+  --underline-color: rgba(79, 70, 229, 0.9);
+}
+
+.underline-teal {
+  --underline-color: rgba(13, 148, 136, 0.9);
+}
+
+.underline-rust {
+  --underline-color: rgba(194, 65, 12, 0.9);
+}
+
+.underline-slate {
+  --underline-color: rgba(51, 65, 85, 0.9);
+}
+
+.underline-emerald {
+  --underline-color: rgba(5, 150, 105, 0.9);
 }
 
 .primary-button {
@@ -158,6 +183,24 @@ body {
   border: 2px solid rgb(79 70 229);
   background: white;
   box-shadow: 0 0 0 5px rgba(99, 102, 241, 0.18);
+}
+
+.rich-html ul,
+.rich-html ol {
+  margin: 0.75rem 0 0 1.25rem;
+  padding-left: 1.1rem;
+}
+
+.rich-html ul {
+  list-style-type: disc;
+}
+
+.rich-html ol {
+  list-style-type: decimal;
+}
+
+.rich-html li + li {
+  margin-top: 0.35rem;
 }
 
 .fullscreen-action-menu {

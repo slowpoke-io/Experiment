@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { StageInstructions } from "@/components/StageInstructions";
+import { testModeDelaySeconds } from "@/lib/test-mode";
 import { StageCard } from "@/components/StageCard";
 import type { ContentStageUI, StageResponse } from "@/lib/types";
 
@@ -21,7 +22,7 @@ export function ContentStage({
 }: ContentStageProps) {
   const [currentPage, setCurrentPage] = useState(0);
   const [secondsRemaining, setSecondsRemaining] = useState(
-    ui.continueDelaySeconds ?? 0,
+    testModeDelaySeconds(ui.continueDelaySeconds),
   );
   const page = ui.pages[currentPage];
   const totalPages = ui.pages.length;
@@ -47,15 +48,17 @@ export function ContentStage({
 
   async function handleNext() {
     if (currentPage < totalPages - 1) {
-      setSecondsRemaining(ui.continueDelaySeconds ?? 0);
+      setSecondsRemaining(testModeDelaySeconds(ui.continueDelaySeconds));
       setCurrentPage((previous) => previous + 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
 
     await onSubmit({
-      acknowledged: true,
-      viewedPageIds: ui.pages.map((item) => item.id),
+      responses: {
+        acknowledged: true,
+        viewedPageIds: ui.pages.map((item) => item.id),
+      },
     });
   }
 
@@ -64,7 +67,7 @@ export function ContentStage({
       return;
     }
 
-    setSecondsRemaining(ui.continueDelaySeconds ?? 0);
+    setSecondsRemaining(testModeDelaySeconds(ui.continueDelaySeconds));
     setCurrentPage((previous) => previous - 1);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -80,7 +83,10 @@ export function ContentStage({
       ui={ui}
     >
       {ui.introTitle ? (
-        <StageInstructions title={ui.introTitle} instructions={ui.instructions} />
+        <StageInstructions
+          title={ui.introTitle}
+          instructions={ui.instructions}
+        />
       ) : null}
 
       <div
@@ -105,10 +111,9 @@ export function ContentStage({
           </h3>
           {page.eyebrow ? (
             <span
-              className={[
-                "eyebrow shrink-0",
-                page.eyebrowClassName ?? "",
-              ].join(" ")}
+              className={["eyebrow shrink-0", page.eyebrowClassName ?? ""].join(
+                " ",
+              )}
             >
               {page.eyebrow}
             </span>
@@ -123,7 +128,11 @@ export function ContentStage({
             {currentPage + 1} / {totalPages}
           </div>
         ) : null}
-        <div className={["body-copy space-y-3.5", page.bodyClassName ?? ""].join(" ")}>
+        <div
+          className={["body-copy space-y-3.5", page.bodyClassName ?? ""].join(
+            " ",
+          )}
+        >
           {page.body.map((paragraph, index) => (
             <div
               key={`${page.id}-body-${index}`}
@@ -132,6 +141,13 @@ export function ContentStage({
           ))}
         </div>
       </div>
+
+      {page.footerInstructions?.length ? (
+        <StageInstructions
+          title="Before you continue"
+          instructions={page.footerInstructions}
+        />
+      ) : null}
 
       <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -159,7 +175,7 @@ export function ContentStage({
               : secondsRemaining > 0
                 ? `Continue in ${secondsRemaining}s`
                 : currentPage === totalPages - 1
-                  ? ui.submitLabel ?? "Continue"
+                  ? (ui.submitLabel ?? "Continue")
                   : `${ui.nextLabel ?? "Next page"} →`}
           </button>
         </div>

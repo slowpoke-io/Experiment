@@ -18,15 +18,38 @@ import type {
 } from "@/lib/types";
 import { VALIDATORS } from "@/lib/validators";
 
+export type SubmitHandlerDeps = {
+  getSupabaseAdmin: typeof getSupabaseAdmin;
+  VALIDATORS: typeof VALIDATORS;
+  getParticipantStages: typeof getParticipantStages;
+  participantStageAt: typeof participantStageAt;
+  nowIso: typeof nowIso;
+  PIPELINE: typeof PIPELINE;
+  PROLIFIC_COMPLETE_URL: string;
+  PROLIFIC_FAIL_URL: string;
+};
+
+const defaultDeps: SubmitHandlerDeps = {
+  getSupabaseAdmin,
+  VALIDATORS,
+  getParticipantStages,
+  participantStageAt,
+  nowIso,
+  PIPELINE,
+  PROLIFIC_COMPLETE_URL,
+  PROLIFIC_FAIL_URL,
+};
+
 const ABANDON_TIMEOUT_SECONDS = 30 * 60;
 
 function isAnswersRecord(value: unknown): value is JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export default async function handler(
+export async function submitHandler(
   req: NextApiRequest,
   res: NextApiResponse<SubmitResponse | ApiErrorResponse>,
+  deps: SubmitHandlerDeps = defaultDeps,
 ) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -47,11 +70,11 @@ export default async function handler(
       });
     }
 
-    const supabase = getSupabaseAdmin();
+    const supabase = deps.getSupabaseAdmin();
     const progressResult = await supabase
       .from("progress")
       .select("*")
-      .eq("pipeline_code", PIPELINE.code)
+      .eq("pipeline_code", deps.PIPELINE.code)
       .eq("prolific_id", prolificId)
       .single();
 
@@ -72,13 +95,13 @@ export default async function handler(
         completed: false,
         lockedOut: true,
         nextStageId: null,
-        redirectUrl: PROLIFIC_FAIL_URL,
+        redirectUrl: deps.PROLIFIC_FAIL_URL,
         verdict: progress.failed_reason ?? { reason: "locked_out" },
       });
     }
 
-    const participantStages = getParticipantStages(progress);
-    const stage = participantStageAt(progress, progress.current_stage_index);
+    const participantStages = deps.getParticipantStages(progress);
+    const stage = deps.participantStageAt(progress, progress.current_stage_index);
     if (!stage) {
       return res.status(409).json({ ok: false, message: "already completed" });
     }
@@ -90,7 +113,7 @@ export default async function handler(
     const duplicateResult = await supabase
       .from("submissions")
       .select("id")
-      .eq("pipeline_code", PIPELINE.code)
+      .eq("pipeline_code", deps.PIPELINE.code)
       .eq("stage_id", stageId)
       .eq("prolific_id", prolificId)
       .maybeSingle();
@@ -118,7 +141,7 @@ export default async function handler(
       throw new Error(`validator not configured for ${stage.id}/${variantId}`);
     }
 
-    const validator = VALIDATORS[validatorName];
+    const validator = deps.VALIDATORS[validatorName];
     if (!validator) {
       throw new Error(`validator not found: ${validatorName}`);
     }
@@ -148,7 +171,7 @@ export default async function handler(
       totalSeconds !== null && totalSeconds > ABANDON_TIMEOUT_SECONDS;
 
     const insertResult = await supabase.from("submissions").insert({
-      pipeline_code: PIPELINE.code,
+      pipeline_code: deps.PIPELINE.code,
       stage_id: stageId,
       variant_id: variantId,
       prolific_id: prolificId,
@@ -174,9 +197,10 @@ export default async function handler(
         .update({
           failed: true,
           failed_reason: timeoutVerdict,
-          updated_at: nowIso(),
+          ...(totalSeconds !== null ? { total_seconds: totalSeconds } : {}),
+          updated_at: deps.nowIso(),
         })
-        .eq("pipeline_code", PIPELINE.code)
+        .eq("pipeline_code", deps.PIPELINE.code)
         .eq("prolific_id", prolificId);
 
       if (updateResult.error) {
@@ -189,7 +213,7 @@ export default async function handler(
         completed: false,
         lockedOut: true,
         nextStageId: null,
-        redirectUrl: PROLIFIC_FAIL_URL,
+        redirectUrl: deps.PROLIFIC_FAIL_URL,
         verdict: timeoutVerdict,
       });
     }
@@ -201,9 +225,10 @@ export default async function handler(
           failed: true,
           failed_stage_id: stageId,
           failed_reason: verdict,
-          updated_at: nowIso(),
+          ...(totalSeconds !== null ? { total_seconds: totalSeconds } : {}),
+          updated_at: deps.nowIso(),
         })
-        .eq("pipeline_code", PIPELINE.code)
+        .eq("pipeline_code", deps.PIPELINE.code)
         .eq("prolific_id", prolificId);
 
       if (updateResult.error) {
@@ -216,7 +241,7 @@ export default async function handler(
         completed: false,
         lockedOut: true,
         nextStageId: null,
-        redirectUrl: PROLIFIC_FAIL_URL,
+        redirectUrl: deps.PROLIFIC_FAIL_URL,
         verdict,
       });
     }
@@ -226,7 +251,7 @@ export default async function handler(
     const updatePayload = {
       current_stage_index: completed ? progress.current_stage_index : nextIndex,
       completed,
-      updated_at: nowIso(),
+      updated_at: deps.nowIso(),
       ...(completed && totalSeconds !== null
         ? { total_seconds: totalSeconds }
         : {}),
@@ -235,7 +260,7 @@ export default async function handler(
     const updateResult = await supabase
       .from("progress")
       .update(updatePayload)
-      .eq("pipeline_code", PIPELINE.code)
+      .eq("pipeline_code", deps.PIPELINE.code)
       .eq("prolific_id", prolificId);
 
     if (updateResult.error) {
@@ -247,11 +272,18 @@ export default async function handler(
       passed: true,
       completed,
       nextStageId: completed ? null : participantStages[nextIndex].id,
-      redirectUrl: completed ? PROLIFIC_COMPLETE_URL : null,
+      redirectUrl: completed ? deps.PROLIFIC_COMPLETE_URL : null,
       verdict,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return res.status(500).json({ ok: false, message });
   }
+}
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse<SubmitResponse | ApiErrorResponse>,
+) {
+  return submitHandler(req, res);
 }

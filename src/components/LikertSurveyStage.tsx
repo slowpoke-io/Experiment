@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { StageInstructions } from "@/components/StageInstructions";
 import { StageCard } from "@/components/StageCard";
+import { testModeDelaySeconds } from "@/lib/test-mode";
 import type {
   ChoiceQuestion,
   LikertQuestion,
@@ -13,6 +14,8 @@ import type {
   SurveyQuestion,
   TextQuestion,
 } from "@/lib/types";
+
+const ANSWERS_REQUIRED_FOR_ADVANCE = process.env.NODE_ENV === "production";
 
 type LikertSurveyStageProps = {
   data: StageResponse;
@@ -32,6 +35,7 @@ type DerivedGroup = LikertQuestionGroup & {
   sectionId?: string;
   sectionTitle?: string;
   sectionDescription?: string;
+  sectionPaginate?: boolean;
 };
 
 type GroupPage = DerivedGroup[];
@@ -44,6 +48,7 @@ function getDerivedGroups(ui: LikertStageUI): DerivedGroup[] {
         sectionId: section.id,
         sectionTitle: section.title,
         sectionDescription: section.description,
+        sectionPaginate: section.paginate,
       })),
     );
   }
@@ -73,21 +78,31 @@ function buildGroupPages(
   const pages: GroupPage[] = [];
   let currentPage: GroupPage = [];
   let currentSectionId: string | undefined;
+  let currentSectionPaginate = true;
 
   for (const group of groups) {
     const nextSectionId = group.sectionId;
+    const nextSectionPaginate = group.sectionPaginate !== false;
     const wouldCrossSection =
       currentPage.length > 0 && currentSectionId !== nextSectionId;
-    const reachedPageLimit = currentPage.length >= groupsPerPage;
+    const reachedPageLimit =
+      currentPage.length > 0 &&
+      currentSectionPaginate &&
+      currentPage.length >= groupsPerPage;
 
     if (wouldCrossSection || reachedPageLimit) {
       pages.push(currentPage);
       currentPage = [];
       currentSectionId = undefined;
+      currentSectionPaginate = true;
+    }
+
+    if (currentPage.length === 0) {
+      currentSectionId = nextSectionId;
+      currentSectionPaginate = nextSectionPaginate;
     }
 
     currentPage.push(group);
-    currentSectionId = nextSectionId;
   }
 
   if (currentPage.length > 0) {
@@ -133,10 +148,10 @@ function LikertItem({
       </div>
 
       <div>
-        <div className="mb-2 flex items-center justify-between text-xs text-slate-500">
+        {/* <div className="mb-2 flex items-center justify-between text-xs text-slate-500">
           <span>{scaleLabels[scaleValues[0]]}</span>
           <span>{scaleLabels[scaleValues[scaleValues.length - 1]]}</span>
-        </div>
+        </div> */}
         <div
           className="grid gap-1.5 md:gap-2"
           style={{
@@ -192,9 +207,9 @@ function LikertItem({
 
 type ChoiceItemProps = {
   question: FlattenedQuestion & ChoiceQuestion;
-  value: string | undefined;
+  value: string | number | undefined;
   questionNumber: number;
-  onChange: (questionId: string, value: string) => void;
+  onChange: (questionId: string, value: string | number) => void;
 };
 
 function ChoiceItem({
@@ -203,6 +218,86 @@ function ChoiceItem({
   questionNumber,
   onChange,
 }: ChoiceItemProps) {
+  if (question.layout === "scale") {
+    return (
+      <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mb-5 flex items-center gap-3">
+          <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-sm font-semibold text-slate-700">
+            {questionNumber}
+          </span>
+          <div className="space-y-2">
+            <div
+              className="text-[15px] font-medium leading-7 tracking-[0.01em] text-slate-900 md:text-base"
+              dangerouslySetInnerHTML={{ __html: question.text }}
+            />
+          </div>
+        </div>
+
+        <div>
+          <div className="mb-2 flex items-start justify-between gap-4 text-[14px] text-slate-800">
+            <span
+              className="max-w-[42%] text-left font-medium"
+              dangerouslySetInnerHTML={{
+                __html: question.minLabel ?? "",
+              }}
+            />
+            <span
+              className="max-w-[42%] text-right font-medium"
+              dangerouslySetInnerHTML={{
+                __html: question.maxLabel ?? "",
+              }}
+            />
+          </div>
+          <div
+            className="grid gap-1.5 md:gap-2"
+            style={{
+              gridTemplateColumns: `repeat(${question.options.length}, minmax(0, 1fr))`,
+            }}
+          >
+            {question.options.map((option) => {
+              const selected = value === option.value;
+
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => onChange(question.id, option.value)}
+                  className={[
+                    "rounded-xl border px-1 py-3 transition-all hover:bg-slate-50",
+                    selected
+                      ? "border-indigo-600 bg-indigo-50 ring-2 ring-indigo-200"
+                      : "border-slate-200 bg-white",
+                  ].join(" ")}
+                  aria-pressed={selected}
+                >
+                  <div className="flex flex-col items-center gap-1.5">
+                    <span
+                      className={[
+                        "flex h-4 w-4 items-center justify-center rounded-full border",
+                        selected ? "border-indigo-600" : "border-slate-300",
+                      ].join(" ")}
+                    >
+                      {selected ? (
+                        <span className="h-2 w-2 rounded-full bg-indigo-600" />
+                      ) : null}
+                    </span>
+                    <span
+                      className={[
+                        "text-center text-[11px] font-semibold leading-tight md:text-sm",
+                        selected ? "text-indigo-700" : "text-slate-700",
+                      ].join(" ")}
+                      dangerouslySetInnerHTML={{ __html: option.label }}
+                    ></span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-5 flex items-center gap-3">
@@ -272,7 +367,13 @@ function SliderItem({
   onChange,
 }: SliderItemProps) {
   const hasAnswered = value !== undefined;
-  const currentValue = hasAnswered ? value : (question.defaultValue ?? question.min);
+  const currentValue = hasAnswered
+    ? value
+    : (question.defaultValue ?? question.min);
+  const tickValues = Array.from(
+    { length: question.max - question.min + 1 },
+    (_, index) => question.min + index,
+  );
 
   return (
     <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
@@ -289,46 +390,69 @@ function SliderItem({
       </div>
 
       <div className="space-y-4">
-        <div className="flex items-start justify-between gap-4 text-sm font-medium text-slate-600">
+        <div className="flex items-start justify-between gap-4 text-[14px] font-medium text-slate-800">
           <span
-            className="max-w-[42%] text-left"
+            className="max-w-[42%] text-left font-medium"
             dangerouslySetInnerHTML={{ __html: question.minLabel }}
           />
           <span
-            className="max-w-[42%] text-right"
+            className="max-w-[42%] text-right font-medium"
             dangerouslySetInnerHTML={{ __html: question.maxLabel }}
           />
         </div>
 
-        <input
-          type="range"
-          min={question.min}
-          max={question.max}
-          step={question.step ?? 1}
-          value={currentValue}
-          onPointerDown={() => {
-            if (!hasAnswered) {
-              onChange(question.id, currentValue);
+        <div className="px-1">
+          <input
+            type="range"
+            min={question.min}
+            max={question.max}
+            step={question.step ?? 1}
+            value={currentValue}
+            onPointerDown={() => {
+              if (!hasAnswered) {
+                onChange(question.id, currentValue);
+              }
+            }}
+            onChange={(event) =>
+              onChange(question.id, Number(event.currentTarget.value))
             }
-          }}
-          onChange={(event) =>
-            onChange(question.id, Number(event.currentTarget.value))
-          }
-          className="slider-input h-3 w-full cursor-pointer appearance-none rounded-full bg-slate-200"
-        />
+            className="slider-input h-3 w-full cursor-pointer appearance-none rounded-full bg-slate-200"
+          />
+        </div>
 
-        <div className="flex items-center justify-between text-sm font-semibold text-slate-700">
-          <span>{question.min}</span>
-          {question.showCurrentValue !== false && hasAnswered ? (
-            <span className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-indigo-700">
-              {currentValue}
-            </span>
-          ) : null}
-          <span>{question.max}</span>
+        <div className="relative h-5 px-1 text-sm font-semibold text-slate-700">
+          {tickValues.map((tickValue, index) => {
+            const isFirst = index === 0;
+            const isLast = index === tickValues.length - 1;
+            const leftPercent =
+              tickValues.length === 1
+                ? 0
+                : ((tickValue - question.min) / (question.max - question.min)) *
+                  100;
+
+            return (
+              <span
+                key={`${question.id}-tick-${tickValue}`}
+                className={[
+                  "absolute top-0",
+                  isFirst
+                    ? "left-0 translate-x-0 text-left"
+                    : isLast
+                      ? "left-full -translate-x-full text-right"
+                      : "-translate-x-1/2 text-center",
+                ].join(" ")}
+                style={
+                  isFirst || isLast ? undefined : { left: `${leftPercent}%` }
+                }
+              >
+                {tickValue}
+              </span>
+            );
+          })}
         </div>
 
         {!hasAnswered ? (
-          <p className="text-xs text-slate-500">
+          <p className="text-[16px] text-slate-500 text-center">
             Please answer by dragging the slider.
           </p>
         ) : null}
@@ -356,13 +480,13 @@ function TextItem({
         <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-sm font-semibold text-slate-700">
           {questionNumber}
         </span>
-        <div className="space-y-2">
+        <div className="space-y-1">
           <div
             className="text-[15px] font-medium leading-6 tracking-[0.01em] text-slate-900 md:text-base"
             dangerouslySetInnerHTML={{ __html: question.text }}
           />
           {question.optional ? (
-            <p className="text-sm text-slate-500">Optional</p>
+            <p className="text-xs text-slate-500">Optional</p>
           ) : null}
         </div>
       </div>
@@ -425,7 +549,7 @@ export function LikertSurveyStage({
     () => buildInitialResponses(),
   );
   const [secondsRemaining, setSecondsRemaining] = useState(
-    ui.continueDelaySeconds ?? 0,
+    testModeDelaySeconds(ui.continueDelaySeconds),
   );
 
   const totalPages = groupPages.length;
@@ -477,20 +601,25 @@ export function LikertSurveyStage({
         }
 
         const responseValue = responses[question.id];
-        return typeof responseValue === "string" && responseValue.trim().length > 0;
+        return (
+          typeof responseValue === "string" && responseValue.trim().length > 0
+        );
       }
 
       return responses[question.id] !== undefined;
     });
   }
 
+  const canAdvanceCurrentPage =
+    !ANSWERS_REQUIRED_FOR_ADVANCE || areCurrentPageAnswersFilled();
+
   async function handleNext() {
-    if (!areCurrentPageAnswersFilled()) {
+    if (!canAdvanceCurrentPage) {
       return;
     }
 
     if (currentPage < totalPages - 1) {
-      setSecondsRemaining(ui.continueDelaySeconds ?? 0);
+      setSecondsRemaining(testModeDelaySeconds(ui.continueDelaySeconds));
       setCurrentPage((previous) => previous + 1);
       if (ui.display?.enableSmoothScroll !== false) {
         setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 0);
@@ -498,8 +627,28 @@ export function LikertSurveyStage({
       return;
     }
 
+    const normalizedResponses = questions.reduce<
+      Record<string, string | number>
+    >((accumulator, question) => {
+      const responseValue = responses[question.id];
+
+      if (
+        typeof responseValue === "string" ||
+        typeof responseValue === "number"
+      ) {
+        accumulator[question.id] = responseValue;
+        return accumulator;
+      }
+
+      if (isTextQuestion(question)) {
+        accumulator[question.id] = "";
+      }
+
+      return accumulator;
+    }, {});
+
     await onSubmit({
-      responses,
+      responses: normalizedResponses,
       likertAnswers: questions
         .filter(
           (question): question is FlattenedQuestion & LikertQuestion =>
@@ -509,24 +658,24 @@ export function LikertSurveyStage({
         )
         .map((question) => ({
           id: question.id,
-          response: responses[question.id],
+          response: normalizedResponses[question.id],
         })),
       choiceAnswers: questions.filter(isChoiceQuestion).map((question) => ({
         id: question.id,
-        response: responses[question.id],
+        response: normalizedResponses[question.id],
       })),
       sliderAnswers: questions.filter(isSliderQuestion).map((question) => ({
         id: question.id,
         response:
-          typeof responses[question.id] === "number"
-            ? responses[question.id]
+          typeof normalizedResponses[question.id] === "number"
+            ? normalizedResponses[question.id]
             : (question.defaultValue ?? question.min),
       })),
       textAnswers: questions.filter(isTextQuestion).map((question) => ({
         id: question.id,
         response:
-          typeof responses[question.id] === "string"
-            ? responses[question.id]
+          typeof normalizedResponses[question.id] === "string"
+            ? normalizedResponses[question.id]
             : "",
       })),
     });
@@ -538,7 +687,7 @@ export function LikertSurveyStage({
     }
 
     setCurrentPage((previous) => previous - 1);
-    setSecondsRemaining(ui.continueDelaySeconds ?? 0);
+    setSecondsRemaining(testModeDelaySeconds(ui.continueDelaySeconds));
     if (ui.display?.enableSmoothScroll !== false) {
       setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 0);
     }
@@ -637,7 +786,9 @@ export function LikertSurveyStage({
                 ) : null
               ) : null}
 
-              {group.title || group.description ? (
+              {group.show ||
+              (process.env.NODE_ENV !== "development" && group.title) ||
+              group.description ? (
                 <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-5 py-4 mt-10">
                   {group.title ? (
                     <h3 className="text-lg font-semibold tracking-tight text-slate-950">
@@ -661,8 +812,9 @@ export function LikertSurveyStage({
                     key={question.id}
                     question={question}
                     value={
-                      typeof responses[question.id] === "string"
-                        ? (responses[question.id] as string)
+                      typeof responses[question.id] === "string" ||
+                      typeof responses[question.id] === "number"
+                        ? responses[question.id]
                         : undefined
                     }
                     questionNumber={groupStartIndex + index + 1}
@@ -725,9 +877,11 @@ export function LikertSurveyStage({
           </button>
 
           <div className="text-center text-sm text-slate-600">
-            {areCurrentPageAnswersFilled() ? (
+            {canAdvanceCurrentPage ? (
               <span className="font-semibold text-emerald-600">
-                All questions on this page are answered.
+                {ANSWERS_REQUIRED_FOR_ADVANCE
+                  ? "All questions on this page are answered."
+                  : "Dev mode: you can continue without answering every item."}
               </span>
             ) : (
               <span>Please answer every item on this page.</span>
@@ -738,7 +892,7 @@ export function LikertSurveyStage({
             type="button"
             onClick={() => void handleNext()}
             disabled={
-              !areCurrentPageAnswersFilled() || disabled || secondsRemaining > 0
+              !canAdvanceCurrentPage || disabled || secondsRemaining > 0
             }
             className="primary-button w-full sm:w-auto disabled:cursor-not-allowed disabled:opacity-50"
           >

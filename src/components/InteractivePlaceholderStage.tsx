@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import Image from "next/image";
 
 import { AIWorkplaceChat } from "@/components/AIWorkplaceChat";
 import { StageInstructions } from "@/components/StageInstructions";
+import { IS_E2E_TEST_MODE, testModeDelaySeconds } from "@/lib/test-mode";
 import type { InteractiveStageUI, StageResponse } from "@/lib/types";
 
 type InteractivePlaceholderStageProps = {
@@ -36,10 +37,13 @@ export function InteractivePlaceholderStage({
   errorMessage,
   onSubmit,
 }: InteractivePlaceholderStageProps) {
-  const [modalOpen, setModalOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState(IS_E2E_TEST_MODE);
   const [feedback, setFeedback] = useState("");
   const [modalSubmitting, setModalSubmitting] = useState(false);
-  const [submitDelayRemaining, setSubmitDelayRemaining] = useState(0);
+  const [submitDelayRemaining, setSubmitDelayRemaining] = useState(
+    IS_E2E_TEST_MODE ? 0 : 0,
+  );
+  const feedbackTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const popupCopy = useMemo(() => {
     return ui.popupByIv2[data.iv2] ?? Object.values(ui.popupByIv2)[0];
@@ -47,9 +51,11 @@ export function InteractivePlaceholderStage({
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setSubmitDelayRemaining(ui.feedbackPrompt.submitDelaySeconds ?? 0);
+      setSubmitDelayRemaining(
+        testModeDelaySeconds(ui.feedbackPrompt.submitDelaySeconds),
+      );
       setModalOpen(true);
-    }, ui.popupDelaySeconds * 1000);
+    }, testModeDelaySeconds(ui.popupDelaySeconds) * 1000);
 
     return () => window.clearTimeout(timer);
   }, [ui.feedbackPrompt.submitDelaySeconds, ui.popupDelaySeconds]);
@@ -73,15 +79,28 @@ export function InteractivePlaceholderStage({
     return () => window.clearInterval(timer);
   }, [modalOpen, modalSubmitting, submitDelayRemaining]);
 
+  useEffect(() => {
+    if (!modalOpen || modalSubmitting) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      feedbackTextareaRef.current?.focus();
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [modalOpen, modalSubmitting]);
+
   async function handleSubmitFeedback() {
     const trimmedFeedback = feedback.trim();
     const modalDecision = trimmedFeedback ? "yes" : "no";
 
     setModalSubmitting(true);
     const ok = await onSubmit({
-      modalDecision,
-      feedback: trimmedFeedback || null,
-      triggeredByIv2: data.iv2,
+      responses: {
+        FEEDBACK_DECISION: modalDecision,
+        FEEDBACK_CONTENT: trimmedFeedback || null,
+      },
     });
 
     if (!ok) {
@@ -112,9 +131,9 @@ export function InteractivePlaceholderStage({
       {modalOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6 pointer-events-none">
           <div className="absolute inset-0 bg-slate-950/45" />
-          <div className="modal-card pointer-events-auto relative">
+          <div className="pointer-events-auto relative w-[min(82rem,80vw)] overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_36px_120px_-50px_rgba(15,23,42,0.5)]">
             {modalSubmitting ? (
-              <div className="flex min-h-56 flex-col items-center justify-center gap-5">
+              <div className="flex min-h-56 flex-col items-center justify-center gap-5 px-7 py-8 sm:px-8">
                 <div className="h-12 w-12 animate-spin rounded-full border-[3px] border-slate-300 border-t-slate-950" />
                 <div className="space-y-2 text-center">
                   <p className="text-lg font-semibold tracking-[0.02em] text-slate-950">
@@ -128,15 +147,15 @@ export function InteractivePlaceholderStage({
                 </div>
               </div>
             ) : (
-              <>
-                <div className="space-y-4 rounded-[1.75rem] border border-slate-200 bg-slate-50 px-5 py-5">
+              <div className="flex flex-col md:flex-row md:items-stretch">
+                <div className="space-y-4 bg-slate-50 px-6 py-6 md:w-1/2 md:px-7 md:py-7">
                   <div className="flex items-center gap-3">
                     <AssistantIcon />
                     <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
                       {popupCopy.initialTitle}
                     </h2>
                   </div>
-                  <div className="body-copy space-y-3">
+                  <div className="body-copy rich-html space-y-3">
                     {popupCopy.initialBody.map((paragraph, index) => (
                       <div
                         key={`${popupCopy.initialTitle}-${index}`}
@@ -145,12 +164,14 @@ export function InteractivePlaceholderStage({
                     ))}
                   </div>
                 </div>
-                <div className="space-y-5 rounded-[1.75rem] border border-indigo-100 bg-white px-5 py-5 shadow-sm">
+                <div className="hidden w-px flex-none bg-slate-200 md:block" />
+                <div className="h-px w-full flex-none bg-slate-200 md:hidden" />
+                <div className="flex min-w-0 md:w-1/2 flex-col gap-5 bg-white px-6 py-6 md:px-7 md:py-7">
                   <div className="space-y-3">
                     <h2 className="text-xl font-semibold tracking-tight text-slate-950">
                       {ui.feedbackPrompt.title}
                     </h2>
-                    <div className="body-copy space-y-3">
+                    <div className="body-copy rich-html space-y-3">
                       {ui.feedbackPrompt.body.map((paragraph, index) => (
                         <div
                           key={`${ui.feedbackPrompt.title}-${index}`}
@@ -160,7 +181,8 @@ export function InteractivePlaceholderStage({
                     </div>
                   </div>
                   <textarea
-                    className="block min-h-48 w-full rounded-[1.5rem] border border-slate-300 bg-white px-5 py-4 text-base text-slate-900 outline-none transition focus:border-slate-900 focus:ring-4 focus:ring-indigo-200/70"
+                    ref={feedbackTextareaRef}
+                    className="block min-h-64 w-full rounded-[1.5rem] border border-slate-300 bg-white px-5 py-4 text-base text-slate-900 outline-none transition focus:border-slate-900 focus:ring-4 focus:ring-indigo-200/70"
                     value={feedback}
                     onChange={(event) => setFeedback(event.target.value)}
                     placeholder={ui.feedbackPrompt.placeholder}
@@ -183,7 +205,7 @@ export function InteractivePlaceholderStage({
                     </button>
                   </div>
                 </div>
-              </>
+              </div>
             )}
           </div>
         </div>

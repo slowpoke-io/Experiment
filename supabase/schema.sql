@@ -97,3 +97,228 @@ group by
   p.failed_reason,
   p.current_stage_index,
   p.total_seconds;
+
+create or replace view public.participant_questionnaire_responses as
+with questionnaire_submissions as (
+  select
+    s.pipeline_code,
+    s.prolific_id,
+    s.stage_id,
+    s.variant_id,
+    s.created_at as submitted_at,
+    s.stage_seconds,
+    s.passed,
+    coalesce(s.answers -> 'responses', '{}'::jsonb) as responses
+  from public.submissions s
+  where s.answers ? 'responses'
+)
+select
+  p.pipeline_code,
+  p.prolific_id,
+  p.iv1,
+  p.iv2,
+  p.completed,
+  p.failed,
+  p.failed_stage_id,
+  p.failed_reason,
+  p.started_at,
+  p.updated_at,
+  p.total_seconds,
+  coalesce(
+    jsonb_object_agg(
+      qs.stage_id,
+      jsonb_build_object(
+        'variant_id', qs.variant_id,
+        'submitted_at', qs.submitted_at,
+        'stage_seconds', qs.stage_seconds,
+        'passed', qs.passed,
+        'responses', qs.responses
+      )
+      order by qs.submitted_at
+    ) filter (where qs.stage_id is not null),
+    '{}'::jsonb
+  ) as answers
+from public.progress p
+left join questionnaire_submissions qs
+  on qs.pipeline_code = p.pipeline_code
+ and qs.prolific_id = p.prolific_id
+group by
+  p.pipeline_code,
+  p.prolific_id,
+  p.iv1,
+  p.iv2,
+  p.completed,
+  p.failed,
+  p.failed_stage_id,
+  p.failed_reason,
+  p.started_at,
+  p.updated_at,
+  p.total_seconds;
+
+create or replace view public.admin_participant_overview as
+with submission_summary as (
+  select
+    s.pipeline_code,
+    s.prolific_id,
+    count(*)::integer as submission_count,
+    max(s.created_at) as last_submission_at
+  from public.submissions s
+  group by
+    s.pipeline_code,
+    s.prolific_id
+),
+last_submission as (
+  select distinct on (s.pipeline_code, s.prolific_id)
+    s.pipeline_code,
+    s.prolific_id,
+    s.stage_id as last_submission_stage_id,
+    s.variant_id as last_submission_variant_id,
+    s.passed as last_submission_passed,
+    s.stage_seconds as last_submission_stage_seconds,
+    s.created_at as last_submission_at
+  from public.submissions s
+  order by
+    s.pipeline_code,
+    s.prolific_id,
+    s.created_at desc
+)
+select
+  p.pipeline_code,
+  p.prolific_id,
+  p.iv1,
+  p.iv2,
+  case
+    when p.completed then 'completed'
+    when p.failed then 'failed'
+    else 'in_progress'
+  end as status,
+  p.completed,
+  p.failed,
+  p.failed_stage_id,
+  case
+    when p.failed_reason is null then null
+    when jsonb_typeof(p.failed_reason) = 'object' and p.failed_reason ? 'reason'
+      then replace(p.failed_reason ->> 'reason', '_', ' ')
+    else left(p.failed_reason::text, 160)
+  end as failed_reason_summary,
+  p.current_stage_index,
+  p.stage_variants,
+  coalesce(ss.submission_count, 0) as submission_count,
+  ls.last_submission_stage_id,
+  ls.last_submission_variant_id,
+  ls.last_submission_passed,
+  ls.last_submission_stage_seconds,
+  ls.last_submission_at,
+  p.started_at,
+  p.updated_at,
+  p.total_seconds
+from public.progress p
+left join submission_summary ss
+  on ss.pipeline_code = p.pipeline_code
+ and ss.prolific_id = p.prolific_id
+left join last_submission ls
+  on ls.pipeline_code = p.pipeline_code
+ and ls.prolific_id = p.prolific_id;
+
+create or replace view public.admin_participant_detail as
+with questionnaire_answers_by_participant as (
+  select
+    s.pipeline_code,
+    s.prolific_id,
+    jsonb_object_agg(
+      s.stage_id,
+      jsonb_build_object(
+        'variant_id', s.variant_id,
+        'submitted_at', s.created_at,
+        'stage_seconds', s.stage_seconds,
+        'passed', s.passed,
+        'responses', coalesce(s.answers -> 'responses', '{}'::jsonb)
+      )
+      order by s.created_at
+    ) as questionnaire_answers
+  from public.submissions s
+  where s.answers ? 'responses'
+  group by
+    s.pipeline_code,
+    s.prolific_id
+),
+submissions_detail_by_participant as (
+  select
+    s.pipeline_code,
+    s.prolific_id,
+    count(*)::integer as submission_count,
+    coalesce(
+      jsonb_agg(
+        jsonb_build_object(
+          'submission_id', s.id,
+          'stage_id', s.stage_id,
+          'variant_id', s.variant_id,
+          'submitted_at', s.created_at,
+          'stage_seconds', s.stage_seconds,
+          'passed', s.passed,
+          'verdict', s.verdict,
+          'answers', s.answers
+        )
+        order by s.created_at
+      ),
+      '[]'::jsonb
+    ) as submissions_detail
+  from public.submissions s
+  group by
+    s.pipeline_code,
+    s.prolific_id
+),
+last_submission as (
+  select distinct on (s.pipeline_code, s.prolific_id)
+    s.pipeline_code,
+    s.prolific_id,
+    s.stage_id as last_submission_stage_id,
+    s.variant_id as last_submission_variant_id,
+    s.passed as last_submission_passed,
+    s.stage_seconds as last_submission_stage_seconds,
+    s.created_at as last_submission_at,
+    s.verdict as last_submission_verdict
+  from public.submissions s
+  order by
+    s.pipeline_code,
+    s.prolific_id,
+    s.created_at desc
+)
+select
+  p.pipeline_code,
+  p.prolific_id,
+  p.iv1,
+  p.iv2,
+  case
+    when p.completed then 'completed'
+    when p.failed then 'failed'
+    else 'in_progress'
+  end as status,
+  p.completed,
+  p.failed,
+  p.failed_stage_id,
+  p.failed_reason,
+  p.current_stage_index,
+  p.stage_variants,
+  coalesce(sd.submission_count, 0) as submission_count,
+  ls.last_submission_stage_id,
+  ls.last_submission_variant_id,
+  ls.last_submission_passed,
+  ls.last_submission_stage_seconds,
+  ls.last_submission_at,
+  ls.last_submission_verdict,
+  p.started_at,
+  p.updated_at,
+  p.total_seconds,
+  coalesce(qa.questionnaire_answers, '{}'::jsonb) as questionnaire_answers,
+  coalesce(sd.submissions_detail, '[]'::jsonb) as submissions_detail
+from public.progress p
+left join questionnaire_answers_by_participant qa
+  on qa.pipeline_code = p.pipeline_code
+ and qa.prolific_id = p.prolific_id
+left join submissions_detail_by_participant sd
+  on sd.pipeline_code = p.pipeline_code
+ and sd.prolific_id = p.prolific_id
+left join last_submission ls
+  on ls.pipeline_code = p.pipeline_code
+ and ls.prolific_id = p.prolific_id;

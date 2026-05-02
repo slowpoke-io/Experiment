@@ -81,7 +81,7 @@ export function ConsentPanel({ prolificId, sharedQuery }: ConsentPanelProps) {
             <p>
               You are invited to participate in a research study examining how
               people perceive and interpret information. The study will take
-              approximately <strong>10–15 minutes</strong> to complete.
+              approximately <strong>8–12 minutes</strong> to complete.
             </p>
           </section>
 

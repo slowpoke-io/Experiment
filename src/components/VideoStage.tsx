@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 
 import { StageInstructions } from "@/components/StageInstructions";
 import { StageCard } from "@/components/StageCard";
+import { IS_E2E_TEST_MODE, testModeDelaySeconds } from "@/lib/test-mode";
 import type { StageResponse, VideoStageUI } from "@/lib/types";
 
 const ClientReactPlayer = dynamic(() => import("react-player"), {
@@ -30,10 +31,11 @@ export function VideoStage({
   errorMessage,
   onSubmit,
 }: VideoStageProps) {
-  const [hasEnded, setHasEnded] = useState(false);
+  const [hasEnded, setHasEnded] = useState(IS_E2E_TEST_MODE);
   const [showTransitionModal, setShowTransitionModal] = useState(false);
+  const [transitionDelayRemaining, setTransitionDelayRemaining] = useState(0);
   const [secondsRemaining, setSecondsRemaining] = useState(
-    ui.continueDelaySeconds ?? 0,
+    testModeDelaySeconds(ui.continueDelaySeconds),
   );
   const isYouTubeEmbed = useMemo(() => {
     return /(?:youtu\.be|youtube(?:-nocookie)?\.com)/i.test(ui.videoUrl);
@@ -58,21 +60,55 @@ export function VideoStage({
     return () => window.clearInterval(timer);
   }, [secondsRemaining]);
 
+  useEffect(() => {
+    if (!showTransitionModal || transitionDelayRemaining <= 0) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setTransitionDelayRemaining((previous) => {
+        if (previous <= 1) {
+          window.clearInterval(timer);
+          return 0;
+        }
+
+        return previous - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [showTransitionModal, transitionDelayRemaining]);
+
   async function handleContinue() {
     if (!hasEnded || disabled || secondsRemaining > 0) {
       return;
     }
 
     if (ui.transitionModal) {
+      setTransitionDelayRemaining(
+        testModeDelaySeconds(ui.transitionModal.confirmDelaySeconds),
+      );
       setShowTransitionModal(true);
       return;
     }
 
-    await onSubmit({ videoCompleted: true });
+    await onSubmit({
+      responses: {
+        videoCompleted: true,
+      },
+    });
   }
 
   async function handleConfirmTransition() {
-    const submitted = await onSubmit({ videoCompleted: true });
+    if (transitionDelayRemaining > 0) {
+      return;
+    }
+
+    const submitted = await onSubmit({
+      responses: {
+        videoCompleted: true,
+      },
+    });
     if (!submitted) {
       setShowTransitionModal(false);
     }
@@ -97,29 +133,43 @@ export function VideoStage({
         ) : null}
 
         <div className="overflow-hidden rounded-[1rem] border border-slate-200 bg-slate-950 shadow-sm">
-          <div className="aspect-video">
-            <ClientReactPlayer
-              src={ui.videoUrl}
-              controls={isYouTubeEmbed ? false : true}
-              width="100%"
-              height="100%"
-              playing={false}
-              playsInline
-              config={
-                isYouTubeEmbed
-                  ? {
-                      youtube: {
-                        disablekb: 1,
-                        // fs: 0,
-                        // rel: 0,
-                        // iv_load_policy: 3,
-                        // cc_load_policy: 0,
-                      },
-                    }
-                  : undefined
-              }
-              onEnded={() => setHasEnded(true)}
-            />
+          <div className="relative aspect-2704/1510">
+            {IS_E2E_TEST_MODE ? (
+              <div className="flex h-full items-center justify-center bg-slate-900 text-sm text-slate-200">
+                Video player bypassed in E2E test mode.
+              </div>
+            ) : (
+              <ClientReactPlayer
+                src={ui.videoUrl}
+                controls={isYouTubeEmbed ? false : true}
+                width="100%"
+                height="100%"
+                playing={false}
+                playsInline
+                config={
+                  isYouTubeEmbed
+                    ? {
+                        youtube: {
+                          disablekb: 1,
+                        },
+                      }
+                    : undefined
+                }
+                onEnded={() => setHasEnded(true)}
+              />
+            )}
+            {hasEnded ? (
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-950/88 px-6 text-center">
+                <div className="space-y-3">
+                  <p className="text-lg font-semibold tracking-[0.02em] text-white">
+                    Video playback finished
+                  </p>
+                  <p className="text-sm text-slate-200">
+                    You may continue when ready.
+                  </p>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -142,9 +192,12 @@ export function VideoStage({
             >
               {disabled
                 ? "Submitting..."
-                : secondsRemaining > 0
-                  ? `Continue in ${secondsRemaining}s`
-                  : (ui.submitLabel ?? "Continue")}
+                : !hasEnded
+                  ? (ui.preCompletionSubmitLabel ??
+                    "Watch the full video to continue")
+                  : secondsRemaining > 0
+                    ? `Continue in ${secondsRemaining}s`
+                    : (ui.submitLabel ?? "Continue")}
             </button>
           </div>
 
@@ -187,9 +240,13 @@ export function VideoStage({
                 className="primary-button w-full sm:w-auto"
                 type="button"
                 onClick={() => void handleConfirmTransition()}
-                disabled={disabled}
+                disabled={disabled || transitionDelayRemaining > 0}
               >
-                {disabled ? "Submitting..." : ui.transitionModal.confirmLabel}
+                {disabled
+                  ? "Submitting..."
+                  : transitionDelayRemaining > 0
+                    ? `${ui.transitionModal.confirmLabel} in ${transitionDelayRemaining}s`
+                    : ui.transitionModal.confirmLabel}
               </button>
             </div>
           </div>

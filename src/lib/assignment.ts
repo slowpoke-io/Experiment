@@ -75,16 +75,9 @@ export async function cleanupAbandoned() {
     Date.now() - ABANDON_TIMEOUT_MINUTES * 60 * 1000,
   ).toISOString();
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("progress")
-    .update({
-      failed: true,
-      failed_reason: {
-        reason: "timeout",
-        cutoff_minutes: ABANDON_TIMEOUT_MINUTES,
-      },
-      updated_at: nowIso(),
-    })
+    .select("pipeline_code, prolific_id, started_at")
     .eq("pipeline_code", PIPELINE.code)
     .eq("completed", false)
     .eq("failed", false)
@@ -92,6 +85,34 @@ export async function cleanupAbandoned() {
 
   if (error) {
     throw error;
+  }
+
+  for (const row of data ?? []) {
+    const startedAt =
+      typeof row.started_at === "string" ? new Date(row.started_at) : null;
+    const totalSeconds =
+      startedAt && !Number.isNaN(startedAt.getTime())
+        ? Math.max(0, Math.round((Date.now() - startedAt.getTime()) / 1000))
+        : null;
+
+    const { error: updateError } = await supabase
+      .from("progress")
+      .update({
+        failed: true,
+        failed_reason: {
+          reason: "timeout",
+          cutoff_minutes: ABANDON_TIMEOUT_MINUTES,
+          ...(totalSeconds !== null ? { total_seconds: totalSeconds } : {}),
+        },
+        ...(totalSeconds !== null ? { total_seconds: totalSeconds } : {}),
+        updated_at: nowIso(),
+      })
+      .eq("pipeline_code", row.pipeline_code)
+      .eq("prolific_id", row.prolific_id);
+
+    if (updateError) {
+      throw updateError;
+    }
   }
 }
 
@@ -198,6 +219,20 @@ export async function resolveAllVariants(
 
   for (const stage of getParticipantStages(progress)) {
     if (stageVariants[stage.id]) {
+      if (
+        stage.variant.directFrom &&
+        !stage.variant.value.includes(stageVariants[stage.id])
+      ) {
+        const sourceValue = progress[stage.variant.directFrom];
+
+        if (
+          typeof sourceValue === "string" &&
+          stage.variant.value.includes(sourceValue)
+        ) {
+          stageVariants[stage.id] = sourceValue;
+        }
+      }
+
       continue;
     }
 

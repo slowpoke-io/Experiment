@@ -196,8 +196,6 @@ export default function StudyStagePage({
 
   useEffect(() => {
     if (!prolificId) {
-      setExperimentState("error");
-      setErrorMessage(null);
       return;
     }
 
@@ -209,7 +207,11 @@ export default function StudyStagePage({
       return;
     }
 
-    setConsentChecked(true);
+    const timer = window.setTimeout(() => {
+      setConsentChecked(true);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [prolificId, redirectToConsent]);
 
   useEffect(() => {
@@ -325,7 +327,16 @@ export default function StudyStagePage({
       }
 
       if (payload.completed && payload.redirectUrl) {
-        window.location.href = payload.redirectUrl;
+        openRedirectModal({
+          open: true,
+          title: "Study complete",
+          description:
+            "Thank you for completing the study. Click the button below to return to Prolific and complete your submission.",
+          note: undefined,
+          buttonLabel: "Return to Prolific",
+          redirectUrl: payload.redirectUrl,
+          tone: "success",
+        });
         return true;
       }
 

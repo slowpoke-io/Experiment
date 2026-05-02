@@ -20,7 +20,9 @@ export function StageInstructions({
 }: StageInstructionsProps) {
   return (
     <div className={`rounded-[1.75rem] p-6 ${toneClassMap[tone]}`}>
-      <h3 className="text-xl font-semibold text-slate-950">{title}</h3>
+      {title && (
+        <h3 className="text-xl font-semibold text-slate-950">{title}</h3>
+      )}
       {instructions.length > 0 ? (
         <ul className="body-copy mt-4 space-y-3">
           {instructions.map((instruction, index) => (
