@@ -84,7 +84,7 @@ export const workplaceAssistantChat: InteractiveChatConfig = {
     {
       id: "resolution_ai",
       role: "ai",
-      html: "<p>Your current leave request status is: <strong>Not submitted.</strong></p><p>You can consider the following options:</p><ul><li>Try again later, or contact IT Team to check the system issue.</li><li>Submit the leave request manually in the HR system</li></ul><p>I'm sorry I couldn't complete the request this time.</p>",
+      html: "<p>Your current leave request status is: <strong>Not submitted.</strong></p><p>You can consider the following options:</p><ul><li>Try again later, or contact the IT team to check the system issue.</li><li>Submit the leave request manually in the HR system</li></ul><p>I'm sorry I couldn't complete the request this time.</p>",
     },
   ],
 };
@@ -173,7 +173,7 @@ export const manipulationIV2QuestionGroup: LikertQuestionGroup = {
   id: "manipulation_iv2",
   title: "About the Pop-up Message",
   description:
-    "Please answer the following items based on the <strong class='text-underline underline-indigo'>Pop-up Message</strong> shown by AI Workplace Assistant",
+    "Please answer the following items based on the <strong class='text-underline underline-indigo'>Pop-up Message</strong> shown by the AI Workplace Assistant.",
   show: true,
   items: [
     {

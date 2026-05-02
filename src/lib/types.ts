@@ -455,3 +455,48 @@ export type AdminParticipantDetailResponse = {
   ok: true;
   participant: AdminDetailRow;
 };
+
+export type AdminResponseColumn = {
+  key: string;
+  stageId: string;
+  sourceKey: string;
+  label: string;
+  kind: "likert" | "choice" | "slider" | "text" | "system";
+  constructId: string | null;
+};
+
+export type AdminConstructDefinition = {
+  id: string;
+  label: string;
+  itemCount: number;
+  maxValue: number;
+  questionColumnKeys: string[];
+};
+
+export type AdminStatsParticipantRow = {
+  pipeline_code: string;
+  prolific_id: string;
+  iv1: string;
+  iv2: string;
+  status: AdminStatus;
+  completed: boolean;
+  failed: boolean;
+  failed_stage_id: string | null;
+  current_stage_index: number;
+  submission_count: number;
+  last_submission_stage_id: string | null;
+  last_submission_at: string | null;
+  started_at: string;
+  updated_at: string;
+  total_seconds: number | null;
+  response_values: Record<string, unknown>;
+  construct_averages: Record<string, number | null>;
+};
+
+export type AdminStatisticsResponse = {
+  ok: true;
+  rows: AdminStatsParticipantRow[];
+  summary: AdminDashboardSummary;
+  responseColumns: AdminResponseColumn[];
+  constructs: AdminConstructDefinition[];
+};

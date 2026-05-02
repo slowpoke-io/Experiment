@@ -711,23 +711,23 @@ const stage7QuestionSections: LikertQuestionSection[] = [
           items: [
             {
               id: "ANTHROPOMORPHISM_1",
-              text: "AI Workplace Assistant has a mind of their own.",
+              text: "The AI Workplace Assistant has a mind of its own.",
             },
             {
               id: "ANTHROPOMORPHISM_2",
-              text: "AI Workplace Assistant devices have consciousness.",
+              text: "The AI Workplace Assistant has consciousness.",
             },
             {
               id: "ANTHROPOMORPHISM_3",
-              text: "AI Workplace Assistant has their own free will.",
+              text: "The AI Workplace Assistant has its own free will.",
             },
             {
               id: "ANTHROPOMORPHISM_4",
-              text: "AI Workplace Assistant will experience emotions.",
+              text: "The AI Workplace Assistant will experience emotions.",
             },
             {
               id: "ANTHROPOMORPHISM_5",
-              text: "AI Workplace Assistant will have intentions.",
+              text: "The AI Workplace Assistant will have intentions.",
             },
           ],
         },
@@ -1030,7 +1030,7 @@ export const PIPELINE: PipelineConfig = {
       ui: {
         default: buildLikertStageUI({
           title: "Questionnaire 2",
-          introTitle: "Instructions",
+          // introTitle: "Instructions",
           instructions: [
             "Use the following scale to indicate how strongly you agree with each statement.",
           ],
@@ -1106,7 +1106,7 @@ export const PIPELINE: PipelineConfig = {
           transitionModal: {
             title: "Next step",
             description:
-              "You will now be taken to the actual AI Workplace Assistant to view the conversation and interact with it from the point where the demo video ended.",
+              "You will now be taken to the actual AI Workplace Assistant, where you will view the conversation and interact with it as the employee in the video, starting from the point where the demo video ended.",
             confirmLabel: "Continue",
             confirmDelaySeconds: STAGE_WAIT_SECONDS.stage5TransitionConfirm,
           },

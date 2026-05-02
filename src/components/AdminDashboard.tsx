@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 
+import Link from "next/link";
+
 import type {
   AdminDashboardResponse,
   AdminDetailRow,
@@ -318,6 +320,9 @@ export function AdminDashboard({
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
+              <Link href="/admin/stats" className="secondary-button">
+                Statistics
+              </Link>
               <button
                 type="button"
                 className="secondary-button"

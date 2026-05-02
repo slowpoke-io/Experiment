@@ -11,18 +11,23 @@ export default function handler(
   req: NextApiRequest,
   res: NextApiResponse<AdminLoginResponse | ApiErrorResponse>,
 ) {
-  if (req.method !== "POST") {
-    res.setHeader("Allow", "POST");
-    return res.status(405).json({ ok: false, message: "Method not allowed" });
+  try {
+    if (req.method !== "POST") {
+      res.setHeader("Allow", "POST");
+      return res.status(405).json({ ok: false, message: "Method not allowed" });
+    }
+
+    const password =
+      typeof req.body?.password === "string" ? req.body.password : "";
+
+    if (!validateAdminPassword(password)) {
+      return res.status(401).json({ ok: false, message: "Invalid password" });
+    }
+
+    setAdminSession(res);
+    return res.json({ ok: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return res.status(500).json({ ok: false, message });
   }
-
-  const password =
-    typeof req.body?.password === "string" ? req.body.password : "";
-
-  if (!validateAdminPassword(password)) {
-    return res.status(401).json({ ok: false, message: "Invalid password" });
-  }
-
-  setAdminSession(res);
-  return res.json({ ok: true });
 }

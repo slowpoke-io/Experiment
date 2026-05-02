@@ -11,11 +11,16 @@ export default function handler(
   req: NextApiRequest,
   res: NextApiResponse<AdminLogoutResponse | ApiErrorResponse>,
 ) {
-  if (req.method !== "POST") {
-    res.setHeader("Allow", "POST");
-    return res.status(405).json({ ok: false, message: "Method not allowed" });
-  }
+  try {
+    if (req.method !== "POST") {
+      res.setHeader("Allow", "POST");
+      return res.status(405).json({ ok: false, message: "Method not allowed" });
+    }
 
-  clearAdminSession(res);
-  return res.json({ ok: true });
+    clearAdminSession(res);
+    return res.json({ ok: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return res.status(500).json({ ok: false, message });
+  }
 }

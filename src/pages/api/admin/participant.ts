@@ -11,23 +11,23 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<AdminParticipantDetailResponse | ApiErrorResponse>,
 ) {
-  if (req.method !== "GET") {
-    res.setHeader("Allow", "GET");
-    return res.status(405).json({ ok: false, message: "Method not allowed" });
-  }
-
-  if (!isAdminAuthorized(req)) {
-    return res.status(401).json({ ok: false, message: "Unauthorized" });
-  }
-
-  const prolificId =
-    typeof req.query.prolificId === "string" ? req.query.prolificId.trim() : "";
-
-  if (!prolificId) {
-    return res.status(400).json({ ok: false, message: "prolificId required" });
-  }
-
   try {
+    if (req.method !== "GET") {
+      res.setHeader("Allow", "GET");
+      return res.status(405).json({ ok: false, message: "Method not allowed" });
+    }
+
+    if (!isAdminAuthorized(req)) {
+      return res.status(401).json({ ok: false, message: "Unauthorized" });
+    }
+
+    const prolificId =
+      typeof req.query.prolificId === "string" ? req.query.prolificId.trim() : "";
+
+    if (!prolificId) {
+      return res.status(400).json({ ok: false, message: "prolificId required" });
+    }
+
     const participant = await fetchAdminParticipantDetail(prolificId);
     return res.json({ ok: true, participant });
   } catch (error) {

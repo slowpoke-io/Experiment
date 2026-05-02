@@ -233,7 +233,12 @@ export function VideoStage({
                   {ui.transitionModal.title}
                 </h2>
               </div>
-              <p className="body-copy">{ui.transitionModal.description}</p>
+              <p
+                className="body-copy"
+                dangerouslySetInnerHTML={{
+                  __html: ui.transitionModal.description,
+                }}
+              />
             </div>
             <div className="flex justify-end">
               <button

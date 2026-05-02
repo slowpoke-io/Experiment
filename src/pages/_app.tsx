@@ -1,4 +1,5 @@
 import "@/styles/globals.css";
+import "react-data-grid/lib/styles.css";
 import type { AppProps } from "next/app";
 import { Instrument_Sans } from "next/font/google";
 

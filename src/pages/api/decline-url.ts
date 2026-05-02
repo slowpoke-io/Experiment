@@ -12,13 +12,18 @@ export default function handler(
   req: NextApiRequest,
   res: NextApiResponse<DeclineResponse | ApiErrorResponse>,
 ) {
-  if (req.method !== "GET") {
-    res.setHeader("Allow", "GET");
-    return res.status(405).json({ ok: false, message: "Method not allowed" });
-  }
+  try {
+    if (req.method !== "GET") {
+      res.setHeader("Allow", "GET");
+      return res.status(405).json({ ok: false, message: "Method not allowed" });
+    }
 
-  return res.json({
-    ok: true,
-    redirectUrl: PROLIFIC_NOCONSENT_URL,
-  });
+    return res.json({
+      ok: true,
+      redirectUrl: PROLIFIC_NOCONSENT_URL,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return res.status(500).json({ ok: false, message });
+  }
 }

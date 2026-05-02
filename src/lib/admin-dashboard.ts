@@ -14,6 +14,11 @@ import type {
 const STATUS_ORDER: AdminStatus[] = ["in_progress", "failed", "completed"];
 const IV_VALUES = ["A", "B"];
 
+type SummaryInputRow = Pick<
+  AdminOverviewRow,
+  "prolific_id" | "status" | "iv1" | "iv2" | "total_seconds"
+>;
+
 function emptyBreakdown() {
   return IV_VALUES.flatMap((iv1) =>
     IV_VALUES.map(
@@ -42,7 +47,7 @@ function buildEmptyFeedbackContentSummary(): AdminFeedbackContentSummary {
   };
 }
 
-function hasFeedbackContent(value: unknown) {
+export function hasFeedbackContent(value: unknown) {
   if (
     typeof value !== "object" ||
     value === null ||
@@ -69,7 +74,7 @@ function hasFeedbackContent(value: unknown) {
 }
 
 export function buildSummary(
-  rows: AdminOverviewRow[],
+  rows: SummaryInputRow[],
   prolificIdsWithFeedbackContent: Set<string> = new Set(),
 ): AdminDashboardSummary {
   const summary = STATUS_ORDER.reduce<AdminDashboardSummary>((acc, status) => {

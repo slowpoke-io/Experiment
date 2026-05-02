@@ -1,12 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 
 import { isAdminAuthorized } from "@/lib/admin-auth";
-import { fetchAdminOverview } from "@/lib/admin-dashboard";
-import type { AdminDashboardResponse, ApiErrorResponse } from "@/lib/types";
+import { fetchAdminStatistics } from "@/lib/admin-statistics";
+import type { AdminStatisticsResponse, ApiErrorResponse } from "@/lib/types";
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<AdminDashboardResponse | ApiErrorResponse>,
+  res: NextApiResponse<AdminStatisticsResponse | ApiErrorResponse>,
 ) {
   try {
     if (req.method !== "GET") {
@@ -18,7 +18,7 @@ export default async function handler(
       return res.status(401).json({ ok: false, message: "Unauthorized" });
     }
 
-    const payload = await fetchAdminOverview();
+    const payload = await fetchAdminStatistics();
     return res.json(payload);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
