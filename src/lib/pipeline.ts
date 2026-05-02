@@ -931,7 +931,7 @@ const postMeasureQuestionSections: LikertQuestionSection[] = [
 ];
 
 export const PIPELINE: PipelineConfig = {
-  code: "study_v1",
+  code: "pilot_0503",
   assign: {
     iv1: { mode: "balanced", values: ["A", "B"] },
     iv2: { mode: "balanced", values: ["A", "B"] },
