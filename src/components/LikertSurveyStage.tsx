@@ -787,8 +787,8 @@ export function LikertSurveyStage({
               ) : null}
 
               {group.show ||
-              (process.env.NODE_ENV !== "development" && group.title) ||
-              group.description ? (
+              (process.env.NODE_ENV === "development" &&
+                (group.title || group.description)) ? (
                 <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-5 py-4 mt-10">
                   {group.title ? (
                     <h3 className="text-lg font-semibold tracking-tight text-slate-950">
