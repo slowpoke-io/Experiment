@@ -37,6 +37,10 @@ function getLeastFrequent(counts: Record<string, number>) {
   return Object.keys(counts).filter((key) => counts[key] === minimum);
 }
 
+function buildIvCellKey(iv1: string, iv2: string) {
+  return `${iv1}::${iv2}`;
+}
+
 async function pickBalancedValue(
   column: "iv1" | "iv2",
   mode: AssignmentMode,
@@ -67,6 +71,45 @@ async function pickBalancedValue(
   }
 
   return randomPick(getLeastFrequent(counts));
+}
+
+async function pickBalancedIvPair(iv1Values: string[], iv2Values: string[]) {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("progress")
+    .select("iv1, iv2")
+    .eq("pipeline_code", PIPELINE.code)
+    .eq("failed", false);
+
+  if (error) {
+    throw error;
+  }
+
+  const counts = Object.fromEntries(
+    iv1Values.flatMap((iv1) =>
+      iv2Values.map((iv2) => [buildIvCellKey(iv1, iv2), 0] as const),
+    ),
+  );
+
+  for (const row of data ?? []) {
+    if (typeof row.iv1 !== "string" || typeof row.iv2 !== "string") {
+      continue;
+    }
+
+    const key = buildIvCellKey(row.iv1, row.iv2);
+    if (key in counts) {
+      counts[key] += 1;
+    }
+  }
+
+  const selectedKey = randomPick(getLeastFrequent(counts));
+  const [iv1, iv2] = selectedKey.split("::");
+
+  if (!iv1 || !iv2) {
+    throw new Error("Unable to determine balanced IV assignment");
+  }
+
+  return { iv1, iv2 };
 }
 
 export async function cleanupAbandoned() {
@@ -155,6 +198,16 @@ export async function balancedPick(
 }
 
 export async function assignIV() {
+  if (
+    PIPELINE.assign.iv1.mode === "balanced" &&
+    PIPELINE.assign.iv2.mode === "balanced"
+  ) {
+    return pickBalancedIvPair(
+      PIPELINE.assign.iv1.values,
+      PIPELINE.assign.iv2.values,
+    );
+  }
+
   const [iv1, iv2] = await Promise.all([
     pickBalancedValue("iv1", PIPELINE.assign.iv1.mode, PIPELINE.assign.iv1.values),
     pickBalancedValue("iv2", PIPELINE.assign.iv2.mode, PIPELINE.assign.iv2.values),
