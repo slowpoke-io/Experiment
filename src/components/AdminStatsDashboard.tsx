@@ -623,7 +623,6 @@ function TwoConditionAverageChart({
   overallMean,
   conditionAMean,
   conditionBMean,
-  leftTone = "amber",
 }: {
   title: string;
   subtitle?: string;
@@ -631,22 +630,17 @@ function TwoConditionAverageChart({
   overallMean: number | null;
   conditionAMean: number | null;
   conditionBMean: number | null;
-  leftTone?: "amber" | "teal";
 }) {
-  const leftFill =
-    leftTone === "amber" ? conditionMeta.A.fill : conditionMeta.B.fill;
-  const rightFill =
-    leftTone === "amber" ? conditionMeta.B.fill : conditionMeta.A.fill;
   const chartData = [
     {
       condition: conditionMeta.A.label,
       value: conditionAMean ?? 0,
-      fill: leftFill,
+      fill: conditionMeta.A.fill,
     },
     {
       condition: conditionMeta.B.label,
       value: conditionBMean ?? 0,
-      fill: rightFill,
+      fill: conditionMeta.B.fill,
     },
   ];
 
@@ -870,7 +864,6 @@ function ConstructPairPanel({
             overallMean={group.left.overallMean}
             conditionAMean={group.left.conditionAMean}
             conditionBMean={group.left.conditionBMean}
-            leftTone="amber"
           />
         ) : null}
         {group.right ? (
@@ -881,7 +874,6 @@ function ConstructPairPanel({
             overallMean={group.right.overallMean}
             conditionAMean={group.right.conditionAMean}
             conditionBMean={group.right.conditionBMean}
-            leftTone="teal"
           />
         ) : null}
       </div>
@@ -908,7 +900,6 @@ function SingleConstructPanel({
       overallMean={group.left.overallMean}
       conditionAMean={group.left.conditionAMean}
       conditionBMean={group.left.conditionBMean}
-      leftTone="amber"
     />
   );
 }

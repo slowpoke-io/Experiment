@@ -96,7 +96,7 @@ type ChoiceAttentionCheckConfig = {
   text: string;
 };
 
-export const ABANDON_TIMEOUT_MINUTES = 30;
+export const ABANDON_TIMEOUT_MINUTES = 50;
 
 export const PROLIFIC_COMPLETE_URL =
   process.env.PROLIFIC_COMPLETE_URL ??

@@ -62,15 +62,20 @@ export function hasFeedbackContent(value: unknown) {
     typeof responses !== "object" ||
     responses === null ||
     Array.isArray(responses) ||
-    !("FEEDBACK_CONTENT" in responses)
+    (!("FEEDBACK_CONTENT" in responses) &&
+      !("feedback_content" in responses) &&
+      !("feedback" in responses))
   ) {
     return false;
   }
 
-  const feedbackContent = (responses as Record<string, unknown>).FEEDBACK_CONTENT;
-  return (
-    typeof feedbackContent === "string" && feedbackContent.trim().length > 0
-  );
+  const responseMap = responses as Record<string, unknown>;
+  const feedbackContent =
+    responseMap.FEEDBACK_CONTENT ??
+    responseMap.feedback_content ??
+    responseMap.feedback;
+
+  return typeof feedbackContent === "string" && feedbackContent.trim().length > 0;
 }
 
 export function buildSummary(

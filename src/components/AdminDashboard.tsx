@@ -320,6 +320,9 @@ export function AdminDashboard({ initialData, onLogout }: AdminDashboardProps) {
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
+              <Link href="/admin/feedback" className="secondary-button">
+                Feedback
+              </Link>
               <Link href="/admin/stats" className="secondary-button">
                 Statistics
               </Link>
@@ -436,8 +439,8 @@ export function AdminDashboard({ initialData, onLogout }: AdminDashboardProps) {
                     Success With Feedback Content
                   </div>
                   <div className="mt-2 text-sm text-slate-600">
-                    Completed participants who entered non-empty
-                    `FEEDBACK_CONTENT`.
+                    Completed participants who entered non-empty feedback in
+                    the stage 6 pop-up.
                   </div>
                 </div>
                 <div className="text-3xl font-semibold tracking-tight text-slate-950">
