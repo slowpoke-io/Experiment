@@ -28,6 +28,31 @@ function normalize(value: QueryValue) {
     .toLowerCase();
 }
 
+function findRequestedAssignmentValue(
+  query: Record<string, QueryValue>,
+  key: "iv1" | "iv2",
+  allowedValues: string[],
+) {
+  const requestedValue = normalize(query[key]);
+  if (!requestedValue) {
+    return null;
+  }
+
+  const matchedValue =
+    allowedValues.find((candidate) => normalize(candidate) === requestedValue) ??
+    null;
+
+  if (!matchedValue) {
+    throw new Error(
+      `Invalid ${key} override: ${String(
+        Array.isArray(query[key]) ? query[key][0] : query[key],
+      )}`,
+    );
+  }
+
+  return matchedValue;
+}
+
 function randomPick<T>(values: T[]) {
   return values[crypto.randomInt(0, values.length)];
 }
@@ -197,20 +222,52 @@ export async function balancedPick(
   return randomPick(getLeastFrequent(counts));
 }
 
-export async function assignIV() {
+export async function assignIV(query: Record<string, QueryValue> = {}) {
+  const requestedIv1 = findRequestedAssignmentValue(
+    query,
+    "iv1",
+    PIPELINE.assign.iv1.values,
+  );
+  const requestedIv2 = findRequestedAssignmentValue(
+    query,
+    "iv2",
+    PIPELINE.assign.iv2.values,
+  );
+
+  if (requestedIv1 && requestedIv2) {
+    return { iv1: requestedIv1, iv2: requestedIv2 };
+  }
+
   if (
     PIPELINE.assign.iv1.mode === "balanced" &&
     PIPELINE.assign.iv2.mode === "balanced"
   ) {
-    return pickBalancedIvPair(
+    const pickedPair = await pickBalancedIvPair(
       PIPELINE.assign.iv1.values,
       PIPELINE.assign.iv2.values,
     );
+
+    return {
+      iv1: requestedIv1 ?? pickedPair.iv1,
+      iv2: requestedIv2 ?? pickedPair.iv2,
+    };
   }
 
   const [iv1, iv2] = await Promise.all([
-    pickBalancedValue("iv1", PIPELINE.assign.iv1.mode, PIPELINE.assign.iv1.values),
-    pickBalancedValue("iv2", PIPELINE.assign.iv2.mode, PIPELINE.assign.iv2.values),
+    requestedIv1
+      ? Promise.resolve(requestedIv1)
+      : pickBalancedValue(
+          "iv1",
+          PIPELINE.assign.iv1.mode,
+          PIPELINE.assign.iv1.values,
+        ),
+    requestedIv2
+      ? Promise.resolve(requestedIv2)
+      : pickBalancedValue(
+          "iv2",
+          PIPELINE.assign.iv2.mode,
+          PIPELINE.assign.iv2.values,
+        ),
   ]);
 
   return { iv1, iv2 };

@@ -114,6 +114,7 @@ export type ContentPage = {
   eyebrow?: string;
   title: string;
   body: string[];
+  progressiveReveal?: boolean;
   footerInstructions?: string[];
   className?: string;
   headerClassName?: string;
