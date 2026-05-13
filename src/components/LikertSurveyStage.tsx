@@ -234,15 +234,15 @@ function ChoiceItem({
         </div>
 
         <div>
-          <div className="mb-2 flex items-start justify-between gap-4 text-[14px] text-slate-800">
+          <div className="mx-3 mb-5 flex items-start justify-between gap-4 text-[16px] text-slate-800">
             <span
-              className="max-w-[42%] text-left font-medium"
+              className="max-w-[45%] text-left font-medium leading-snug"
               dangerouslySetInnerHTML={{
                 __html: question.minLabel ?? "",
               }}
             />
             <span
-              className="max-w-[42%] text-right font-medium"
+              className="max-w-[45%] text-right font-medium leading-snug"
               dangerouslySetInnerHTML={{
                 __html: question.maxLabel ?? "",
               }}
@@ -392,11 +392,11 @@ function SliderItem({
       <div className="space-y-4">
         <div className="flex items-start justify-between gap-4 text-[14px] font-medium text-slate-800">
           <span
-            className="max-w-[42%] text-left font-medium"
+            className="max-w-[45%] text-left font-medium"
             dangerouslySetInnerHTML={{ __html: question.minLabel }}
           />
           <span
-            className="max-w-[42%] text-right font-medium"
+            className="max-w-[45%] text-right font-medium leading-normal"
             dangerouslySetInnerHTML={{ __html: question.maxLabel }}
           />
         </div>
@@ -408,13 +408,11 @@ function SliderItem({
             max={question.max}
             step={question.step ?? 1}
             value={currentValue}
-            onPointerDown={() => {
-              if (!hasAnswered) {
-                onChange(question.id, currentValue);
-              }
-            }}
             onChange={(event) =>
-              onChange(question.id, Number(event.currentTarget.value))
+              onChange(
+                question.id,
+                Math.round(Number(event.currentTarget.value)),
+              )
             }
             className="slider-input h-3 w-full cursor-pointer appearance-none rounded-full bg-slate-200"
           />
@@ -453,7 +451,8 @@ function SliderItem({
 
         {!hasAnswered ? (
           <p className="text-[16px] text-slate-500 text-center">
-            Please answer by dragging the slider.
+            The slider starts in the middle. Please move it toward the number
+            that best matches your answer.
           </p>
         ) : null}
       </div>
@@ -797,7 +796,11 @@ export function LikertSurveyStage({
                   ) : null}
                   {group.description ? (
                     <div
-                      className={group.title ? "body-copy mt-2" : "body-copy"}
+                      className={
+                        group.title
+                          ? "body-copy mt-2 leading-relaxed"
+                          : "body-copy"
+                      }
                       dangerouslySetInnerHTML={{
                         __html: group.description,
                       }}

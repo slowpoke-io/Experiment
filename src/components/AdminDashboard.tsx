@@ -97,7 +97,10 @@ function renderBreakdownTable(
         </thead>
         <tbody>
           {["A", "B"].map((iv1) => (
-            <tr key={`${keyPrefix}-${iv1}`} className="border-t border-slate-200/80">
+            <tr
+              key={`${keyPrefix}-${iv1}`}
+              className="border-t border-slate-200/80"
+            >
               <td className="px-3 py-2 font-semibold text-slate-700">{iv1}</td>
               {["A", "B"].map((iv2) => {
                 const cell = breakdown.find(
@@ -149,10 +152,7 @@ function getDisplayedStageVariants(participant: AdminDetailRow) {
   return stageVariants;
 }
 
-export function AdminDashboard({
-  initialData,
-  onLogout,
-}: AdminDashboardProps) {
+export function AdminDashboard({ initialData, onLogout }: AdminDashboardProps) {
   const [dashboardData, setDashboardData] =
     useState<AdminDashboardResponse>(initialData);
   const [refreshing, setRefreshing] = useState(false);
@@ -171,9 +171,9 @@ export function AdminDashboard({
   const [detailTab, setDetailTab] = useState<"answers" | "submissions">(
     "answers",
   );
-  const [detailCache, setDetailCache] = useState<Record<string, AdminDetailRow>>(
-    {},
-  );
+  const [detailCache, setDetailCache] = useState<
+    Record<string, AdminDetailRow>
+  >({});
 
   const filteredRows = useMemo(() => {
     const normalizedSearch = searchText.trim().toLowerCase();
@@ -234,7 +234,7 @@ export function AdminDashboard({
   ]);
 
   const selectedParticipant = selectedProlificId
-    ? detailCache[selectedProlificId] ?? null
+    ? (detailCache[selectedProlificId] ?? null)
     : null;
 
   async function refreshDashboard() {
@@ -312,7 +312,7 @@ export function AdminDashboard({
             <div className="space-y-2">
               <span className="eyebrow">Admin</span>
               <h1 className="text-3xl font-semibold tracking-tight text-slate-950">
-                Participant Dashboard
+                Participant Dashboard :)
               </h1>
               <p className="body-copy">
                 Monitor participant progress, failures, completions, and
@@ -320,6 +320,9 @@ export function AdminDashboard({
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
+              <Link href="/admin/feedback" className="secondary-button">
+                Feedback
+              </Link>
               <Link href="/admin/stats" className="secondary-button">
                 Statistics
               </Link>
@@ -401,7 +404,9 @@ export function AdminDashboard({
                     Min
                   </div>
                   <div className="mt-2 text-lg font-semibold text-slate-950">
-                    {formatDuration(dashboardData.summary.completedDuration.minSeconds)}
+                    {formatDuration(
+                      dashboardData.summary.completedDuration.minSeconds,
+                    )}
                   </div>
                 </div>
                 <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
@@ -409,7 +414,9 @@ export function AdminDashboard({
                     Max
                   </div>
                   <div className="mt-2 text-lg font-semibold text-slate-950">
-                    {formatDuration(dashboardData.summary.completedDuration.maxSeconds)}
+                    {formatDuration(
+                      dashboardData.summary.completedDuration.maxSeconds,
+                    )}
                   </div>
                 </div>
                 <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
@@ -432,7 +439,8 @@ export function AdminDashboard({
                     Success With Feedback Content
                   </div>
                   <div className="mt-2 text-sm text-slate-600">
-                    Completed participants who entered non-empty `FEEDBACK_CONTENT`.
+                    Completed participants who entered non-empty feedback in
+                    the stage 6 pop-up.
                   </div>
                 </div>
                 <div className="text-3xl font-semibold tracking-tight text-slate-950">
@@ -471,7 +479,9 @@ export function AdminDashboard({
               <select
                 value={statusFilter}
                 onChange={(event) =>
-                  setStatusFilter(event.currentTarget.value as AdminStatus | "all")
+                  setStatusFilter(
+                    event.currentTarget.value as AdminStatus | "all",
+                  )
                 }
                 className="block w-full rounded-[1.25rem] border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-900 focus:ring-4 focus:ring-indigo-200/70"
               >
@@ -483,7 +493,9 @@ export function AdminDashboard({
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-700">IV1</label>
+              <label className="text-sm font-semibold text-slate-700">
+                IV1
+              </label>
               <select
                 value={iv1Filter}
                 onChange={(event) =>
@@ -498,7 +510,9 @@ export function AdminDashboard({
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-700">IV2</label>
+              <label className="text-sm font-semibold text-slate-700">
+                IV2
+              </label>
               <select
                 value={iv2Filter}
                 onChange={(event) =>
@@ -556,8 +570,12 @@ export function AdminDashboard({
                   <th className="px-4 py-3 text-left font-semibold">Status</th>
                   <th className="px-4 py-3 text-left font-semibold">IV1</th>
                   <th className="px-4 py-3 text-left font-semibold">IV2</th>
-                  <th className="px-4 py-3 text-left font-semibold">Stage idx</th>
-                  <th className="px-4 py-3 text-left font-semibold">Failed stage</th>
+                  <th className="px-4 py-3 text-left font-semibold">
+                    Stage idx
+                  </th>
+                  <th className="px-4 py-3 text-left font-semibold">
+                    Failed stage
+                  </th>
                   <th className="px-4 py-3 text-left font-semibold">
                     Submission count
                   </th>
@@ -604,7 +622,9 @@ export function AdminDashboard({
                       <button
                         type="button"
                         className="secondary-button px-4 py-2 text-xs"
-                        onClick={() => void openParticipantDetail(row.prolific_id)}
+                        onClick={() =>
+                          void openParticipantDetail(row.prolific_id)
+                        }
                       >
                         View detail
                       </button>
@@ -723,7 +743,9 @@ export function AdminDashboard({
                           Last verdict
                         </div>
                         <pre className="overflow-x-auto rounded-[1rem] border border-slate-200 bg-slate-50 p-4 text-xs leading-5 text-slate-800">
-                          {formatJson(selectedParticipant.last_submission_verdict)}
+                          {formatJson(
+                            selectedParticipant.last_submission_verdict,
+                          )}
                         </pre>
                       </div>
                       <div>
@@ -755,7 +777,9 @@ export function AdminDashboard({
                           Last submission time
                         </div>
                         <div className="mt-2 text-sm font-semibold text-slate-950">
-                          {formatDateTime(selectedParticipant.last_submission_at)}
+                          {formatDateTime(
+                            selectedParticipant.last_submission_at,
+                          )}
                         </div>
                       </div>
                       <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
@@ -780,7 +804,9 @@ export function AdminDashboard({
                         Stage variants
                       </div>
                       <pre className="overflow-x-auto rounded-[1rem] border border-slate-200 bg-slate-50 p-4 text-xs leading-5 text-slate-800">
-                        {formatJson(getDisplayedStageVariants(selectedParticipant))}
+                        {formatJson(
+                          getDisplayedStageVariants(selectedParticipant),
+                        )}
                       </pre>
                     </div>
                   </div>

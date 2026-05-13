@@ -114,6 +114,8 @@ export type ContentPage = {
   eyebrow?: string;
   title: string;
   body: string[];
+  progressiveReveal?: boolean;
+  initialVisibleParagraphs?: number;
   footerInstructions?: string[];
   className?: string;
   headerClassName?: string;
@@ -454,6 +456,29 @@ export type AdminDashboardResponse = {
 export type AdminParticipantDetailResponse = {
   ok: true;
   participant: AdminDetailRow;
+};
+
+export type AdminFeedbackRow = {
+  pipeline_code: string;
+  prolific_id: string;
+  iv1: string;
+  iv2: string;
+  status: AdminStatus;
+  completed: boolean;
+  failed: boolean;
+  failed_stage_id: string | null;
+  started_at: string;
+  updated_at: string;
+  total_seconds: number | null;
+  feedback_content: string;
+  feedback_reason: string | null;
+  feedback_submitted_at: string;
+  reason_submitted_at: string | null;
+};
+
+export type AdminFeedbackResponse = {
+  ok: true;
+  rows: AdminFeedbackRow[];
 };
 
 export type AdminResponseColumn = {

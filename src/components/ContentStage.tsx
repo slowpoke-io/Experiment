@@ -20,12 +20,35 @@ export function ContentStage({
   errorMessage,
   onSubmit,
 }: ContentStageProps) {
+  function getInitialRevealCount(pageIndex: number) {
+    const targetPage = ui.pages[pageIndex];
+    if (!targetPage) {
+      return 0;
+    }
+
+    if (!targetPage.progressiveReveal) {
+      return targetPage.body.length;
+    }
+
+    return Math.min(
+      targetPage.initialVisibleParagraphs ?? 0,
+      targetPage.body.length,
+    );
+  }
+
   const [currentPage, setCurrentPage] = useState(0);
   const [secondsRemaining, setSecondsRemaining] = useState(
     testModeDelaySeconds(ui.continueDelaySeconds),
   );
+  const [revealedParagraphCount, setRevealedParagraphCount] = useState(
+    getInitialRevealCount(0),
+  );
   const page = ui.pages[currentPage];
   const totalPages = ui.pages.length;
+  const allParagraphsRevealed =
+    revealedParagraphCount >= (page?.body.length ?? 0);
+  const nextLockedByProgressiveReveal =
+    Boolean(page?.progressiveReveal) && !allParagraphsRevealed;
 
   useEffect(() => {
     if (secondsRemaining <= 0) {
@@ -50,6 +73,7 @@ export function ContentStage({
     if (currentPage < totalPages - 1) {
       setSecondsRemaining(testModeDelaySeconds(ui.continueDelaySeconds));
       setCurrentPage((previous) => previous + 1);
+      setRevealedParagraphCount(getInitialRevealCount(currentPage + 1));
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
@@ -69,7 +93,18 @@ export function ContentStage({
 
     setSecondsRemaining(testModeDelaySeconds(ui.continueDelaySeconds));
     setCurrentPage((previous) => previous - 1);
+    setRevealedParagraphCount(getInitialRevealCount(currentPage - 1));
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function handleRevealNextParagraph() {
+    if (!page?.progressiveReveal || allParagraphsRevealed) {
+      return;
+    }
+
+    setRevealedParagraphCount((previous) =>
+      Math.min(previous + 1, page.body.length),
+    );
   }
 
   return (
@@ -133,12 +168,24 @@ export function ContentStage({
             " ",
           )}
         >
-          {page.body.map((paragraph, index) => (
+          {page.body
+            .slice(0, page.progressiveReveal ? revealedParagraphCount : page.body.length)
+            .map((paragraph, index) => (
             <div
               key={`${page.id}-body-${index}`}
               dangerouslySetInnerHTML={{ __html: paragraph }}
             />
-          ))}
+            ))}
+          {page.progressiveReveal && !allParagraphsRevealed ? (
+            <button
+              type="button"
+              onClick={handleRevealNextParagraph}
+              disabled={disabled}
+              className="mt-2 w-full rounded-[1.25rem] border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Click to see the next message
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -161,17 +208,23 @@ export function ContentStage({
           </button>
 
           <div className="text-center text-sm text-slate-600">
-            Continue after reading the current page.
+            {nextLockedByProgressiveReveal
+              ? "Reveal each point on this page before continuing."
+              : "Continue after reading the current page."}
           </div>
 
           <button
             type="button"
             onClick={() => void handleNext()}
-            disabled={disabled || secondsRemaining > 0}
+            disabled={
+              disabled || secondsRemaining > 0 || nextLockedByProgressiveReveal
+            }
             className="primary-button w-full sm:w-auto"
           >
             {disabled
               ? "Submitting..."
+              : nextLockedByProgressiveReveal
+                ? "Reveal all points to continue"
               : secondsRemaining > 0
                 ? `Continue in ${secondsRemaining}s`
                 : currentPage === totalPages - 1

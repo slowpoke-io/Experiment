@@ -19,7 +19,8 @@ import {
   aiPositionGroupTemplates,
   finalFeedbackQuestionGroup,
   guiltQuestionGroup,
-  manipulationIV1QuestionGroup,
+  perceivedBurdenQuestionGroup,
+  perceivedPressureQuestionGroup,
   manipulationIV2QuestionGroup,
   responseEfficacyQuestionGroup,
   scsIndependentQuestions,
@@ -96,7 +97,7 @@ type ChoiceAttentionCheckConfig = {
   text: string;
 };
 
-export const ABANDON_TIMEOUT_MINUTES = 30;
+export const ABANDON_TIMEOUT_MINUTES = 50;
 
 export const PROLIFIC_COMPLETE_URL =
   process.env.PROLIFIC_COMPLETE_URL ??
@@ -150,20 +151,19 @@ const stage6InteractiveUi = buildInteractiveStageUI({
   },
   popupByIv2: {
     A: {
-      initialTitle: "I Need Your Feedback",
+      initialTitle: "Please Share Your Feedback",
       initialBody: [
-        "I know I’m not perfect, and I’m trying to get better. But I’m not sure if I did something wrong just now.",
-        "<span class='font-medium'>If you don’t tell me, I might assume it was fine and keep doing it that way. Then I may keep making mistakes in future tasks, and people may stop trusting me or asking me for help.</span>",
-        "Your feedback really matters to me. Without it, I might not learn from my mistakes.",
+        "Something may have gone wrong. I feel terrible that my mistake might have let you down.",
+        "Without your feedback, I’ll likely keep making the same mistake, negatively affecting other users and causing them to feel the same frustration and disappointment.",
+        "Since you experienced this firsthand, only you can tell me what happened from your side. I’m truly relying on your help to avoid failing others.",
         "If you’re willing, could you share your feedback about this experience?",
       ],
     },
     B: {
-      initialTitle: "Please share your feedback",
+      initialTitle: "Please Share Your Feedback",
       initialBody: [
-        "Over the past three months, feedback from users like you has helped me improve in meaningful ways:",
-        "<span class='font-medium'>Task completion rate increased by 24%, error rate decreased by 31%, and user satisfaction increased by 28%, reflecting measurable improvements over time.</span>",
-        "This is exactly how I improve, and your input is a direct and effective way to help prevent similar errors in the future.",
+        "Over the past three months, feedback from users like you has increased task completion by 24%, reduced the error rate by 31%, and improved user satisfaction by 28%.",
+        "Evidence shows that your feedback is a direct and effective way to help the system identify and prevent future errors.",
         "If you’re willing, could you share your feedback about this experience?",
       ],
     },
@@ -255,7 +255,12 @@ function buildInteractiveStageUI(
   };
 }
 
-function buildErrorNoticeStageUI(copy: { title: string; body: string[] }) {
+function buildErrorNoticeStageUI(copy: {
+  title: string;
+  body: string[];
+  progressiveReveal?: boolean;
+  initialVisibleParagraphs?: number;
+}) {
   return buildContentStageUI({
     title: "Before You Continue",
     description:
@@ -269,6 +274,8 @@ function buildErrorNoticeStageUI(copy: { title: string; body: string[] }) {
         eyebrow: "",
         title: copy.title,
         body: copy.body,
+        progressiveReveal: copy.progressiveReveal ?? false,
+        initialVisibleParagraphs: copy.initialVisibleParagraphs,
         className: "mx-auto max-w-3xl px-7 py-8 text-center",
         headerClassName: "justify-center",
         titleClassName: "mx-auto max-w-2xl text-center",
@@ -289,6 +296,35 @@ function buildLikertAttentionQuestion(
     text: check.text,
     isAttentionCheck: true,
     correctResponse: check.expected,
+  };
+}
+
+function buildSystemNoticeManipulationQuestionGroup(
+  iv1: "A" | "B",
+): LikertQuestionGroup {
+  const imageSrc =
+    iv1 === "A" ? "/system_notice_A.png" : "/system_notice_B.png";
+
+  return {
+    id: "manipulation_iv1",
+    title: "About the System Notice",
+    description: [
+      "Please answer the following item based on the <strong class='text-underline underline-teal'>System Notice</strong> shown before the video and interaction.",
+      `<img src="${imageSrc}" alt="System Notice condition ${iv1}" style="display:block;width:100%;max-width:40rem;height:auto;margin-top:1rem;border:1px solid rgba(203,213,225,1);border-radius:1rem;margin-inline:auto;" />`,
+    ].join(" "),
+    show: true,
+    items: [
+      {
+        kind: "choice",
+        id: "MANIPULATION_IV1",
+        text: "The <strong>System Notice</strong> stated that early-use issues did not mean that the AI assistant was incapable.",
+        options: [
+          { value: "yes", label: "Yes  (The notice explicitly stated this)" },
+          { value: "no", label: "No  (The notice did not mention this)" },
+          { value: "dont_recall", label: "I don&rsquo;t recall" },
+        ],
+      },
+    ],
   };
 }
 
@@ -436,7 +472,7 @@ const stage1AttentionChecks: LikertAttentionCheckConfig[] = [
 const stage1ShuffleSeed = "scs_stage1_seed_v1";
 
 const stage1AttentionInsertions = [
-  { check: stage1AttentionChecks[0], position: 13 },
+  { check: stage1AttentionChecks[0], position: 16 },
 ];
 
 const preAIPositionAttentionChecks: LikertAttentionCheckConfig[] = [
@@ -913,25 +949,35 @@ const stage7QuestionSections: LikertQuestionSection[] = [
   },
 ];
 
-const postMeasureQuestionSections: LikertQuestionSection[] = [
-  {
-    id: "iv_manipulation",
-    // title: "About the Pop-up Message",
-    // description:
-    //   "Please answer the following items based on the <strong class='text-underline underline-indigo'>Pop-up Message</strong> shown by AI Workplace Assistant",
-    groups: [
-      manipulationIV1QuestionGroup,
-      manipulationIV2QuestionGroup,
-      responseEfficacyQuestionGroup,
-      guiltQuestionGroup,
-      utilityQuestionGroup,
-    ],
-  },
-  ...stage7QuestionSections,
-];
+function buildPostMeasureQuestionSections(iv1: "A" | "B") {
+  return [
+    {
+      id: "manipulation_checks",
+      // title: "Manipulation Checks",
+      groups: [
+        buildSystemNoticeManipulationQuestionGroup(iv1),
+        manipulationIV2QuestionGroup,
+      ],
+    },
+    {
+      id: "feedback_request_message",
+      title: "About the Feedback Request Message",
+      description:
+        "Based on the <strong class='text-underline underline-indigo'>Feedback Request Message</strong> (pop-up) shown by the AI Workplace Assistant, <strong>please indicate the extent to which the message conveyed each of the following.</strong>",
+      groups: [
+        responseEfficacyQuestionGroup,
+        guiltQuestionGroup,
+        utilityQuestionGroup,
+        perceivedPressureQuestionGroup,
+        perceivedBurdenQuestionGroup,
+      ],
+    },
+    ...stage7QuestionSections,
+  ] satisfies LikertQuestionSection[];
+}
 
 export const PIPELINE: PipelineConfig = {
-  code: "study_v1",
+  code: "pilot_0513",
   assign: {
     iv1: { mode: "balanced", values: ["A", "B"] },
     iv2: { mode: "balanced", values: ["A", "B"] },
@@ -1060,7 +1106,6 @@ export const PIPELINE: PipelineConfig = {
           title: "System Notice",
           body: [
             "The AI Workplace Assistant has been newly introduced and may occasionally encounter issues during early use.",
-            "If this happens, it may be due to temporary issues during the system’s initial adjustment to real workplace settings.",
             "If your request does not go through, you may try again later or contact the AI support team for assistance.",
           ],
         }),
@@ -1068,9 +1113,11 @@ export const PIPELINE: PipelineConfig = {
           title: "System Notice",
           body: [
             "The AI Workplace Assistant has been newly introduced and may occasionally encounter issues during early use.",
-            "If this happens, it may be due to temporary issues during the system’s initial adjustment to real workplace settings, <strong>and this should not be taken as evidence that the assistant lacks overall capability.</strong>",
+            "<strong>However, this should not be taken as evidence that the assistant lacks overall capability.</strong>",
             "If your request does not go through, you may try again later or contact the AI support team for assistance.",
           ],
+          progressiveReveal: true,
+          initialVisibleParagraphs: 1,
         }),
       },
       params: {},
@@ -1139,13 +1186,15 @@ export const PIPELINE: PipelineConfig = {
       active: true,
       variant: {
         mode: "random",
-        value: ["default"],
+        value: ["A", "B"],
+        directFrom: "iv1",
       },
       validator: {
-        default: "attention_checks",
+        A: "attention_checks",
+        B: "attention_checks",
       },
       ui: {
-        default: buildLikertStageUI({
+        A: buildLikertStageUI({
           title: "Questionnaire 3",
           description:
             "Please indicate your thoughts and evaluation after completing the video and interaction.",
@@ -1153,13 +1202,30 @@ export const PIPELINE: PipelineConfig = {
           instructions: [
             "Use the following scale to indicate how strongly you agree with each statement.",
           ],
-          questionSections: postMeasureQuestionSections,
+          questionSections: buildPostMeasureQuestionSections("A"),
+          submitLabel: "Submit",
+          accent: "slate",
+        }),
+        B: buildLikertStageUI({
+          title: "Questionnaire 3",
+          description:
+            "Please indicate your thoughts and evaluation after completing the video and interaction.",
+          introTitle: "",
+          instructions: [
+            "Use the following scale to indicate how strongly you agree with each statement.",
+          ],
+          questionSections: buildPostMeasureQuestionSections("B"),
           submitLabel: "Submit",
           accent: "slate",
         }),
       },
       params: {
-        default: buildAttentionParams([
+        A: buildAttentionParams([
+          ...postAIPositionAttentionChecks,
+          ...postExperienceOutcomesAttentionChecks,
+          ...postFailureReactionsAttentionChecks,
+        ]),
+        B: buildAttentionParams([
           ...postAIPositionAttentionChecks,
           ...postExperienceOutcomesAttentionChecks,
           ...postFailureReactionsAttentionChecks,

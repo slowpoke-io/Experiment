@@ -103,7 +103,22 @@ export async function initHandler(
     let progress = await loadProgress();
 
     if (!progress) {
-      const { iv1, iv2 } = await deps.assignIV();
+      let iv1: string;
+      let iv2: string;
+
+      try {
+        ({ iv1, iv2 } = await deps.assignIV(req.query));
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Invalid IV override";
+
+        if (message.startsWith("Invalid iv")) {
+          return res.status(400).json({ ok: false, message });
+        }
+
+        throw error;
+      }
+
       const createdAt = deps.nowIso();
 
       const insertResult = await supabase.from("progress").insert({

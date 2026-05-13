@@ -50,12 +50,15 @@ export function InteractivePlaceholderStage({
   }, [data.iv2, ui.popupByIv2]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setSubmitDelayRemaining(
-        testModeDelaySeconds(ui.feedbackPrompt.submitDelaySeconds),
-      );
-      setModalOpen(true);
-    }, testModeDelaySeconds(ui.popupDelaySeconds) * 1000);
+    const timer = window.setTimeout(
+      () => {
+        setSubmitDelayRemaining(
+          testModeDelaySeconds(ui.feedbackPrompt.submitDelaySeconds),
+        );
+        setModalOpen(true);
+      },
+      testModeDelaySeconds(ui.popupDelaySeconds) * 1000,
+    );
 
     return () => window.clearTimeout(timer);
   }, [ui.feedbackPrompt.submitDelaySeconds, ui.popupDelaySeconds]);
@@ -131,7 +134,7 @@ export function InteractivePlaceholderStage({
       {modalOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6 pointer-events-none">
           <div className="absolute inset-0 bg-slate-950/45" />
-          <div className="pointer-events-auto relative w-[min(82rem,80vw)] overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_36px_120px_-50px_rgba(15,23,42,0.5)]">
+          <div className="pointer-events-auto relative w-[min(82rem,75vw)] overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_36px_120px_-50px_rgba(15,23,42,0.5)]">
             {modalSubmitting ? (
               <div className="flex min-h-56 flex-col items-center justify-center gap-5 px-7 py-8 sm:px-8">
                 <div className="h-12 w-12 animate-spin rounded-full border-[3px] border-slate-300 border-t-slate-950" />
@@ -159,6 +162,7 @@ export function InteractivePlaceholderStage({
                     {popupCopy.initialBody.map((paragraph, index) => (
                       <div
                         key={`${popupCopy.initialTitle}-${index}`}
+                        className="text-[1.2rem] leading-normal"
                         dangerouslySetInnerHTML={{ __html: paragraph }}
                       />
                     ))}
@@ -168,7 +172,7 @@ export function InteractivePlaceholderStage({
                 <div className="h-px w-full flex-none bg-slate-200 md:hidden" />
                 <div className="flex min-w-0 md:w-1/2 flex-col gap-5 bg-white px-6 py-6 md:px-7 md:py-7">
                   <div className="space-y-3">
-                    <h2 className="text-xl font-semibold tracking-tight text-slate-950">
+                    <h2 className="text-[22px] font-semibold tracking-tight text-slate-950 mt-2.5">
                       {ui.feedbackPrompt.title}
                     </h2>
                     <div className="body-copy rich-html space-y-3">

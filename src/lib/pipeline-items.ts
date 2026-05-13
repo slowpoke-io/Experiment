@@ -173,22 +173,22 @@ export const manipulationIV2QuestionGroup: LikertQuestionGroup = {
   id: "manipulation_iv2",
   title: "About the Pop-up Message",
   description:
-    "Please answer the following items based on the <strong class='text-underline underline-indigo'>Pop-up Message</strong> shown by the AI Workplace Assistant.",
+    "Please answer the following items based on the <strong class='text-underline underline-indigo'>Feedback Request Message (Pop-up)</strong> shown by the AI Workplace Assistant during your interaction with it.",
   show: true,
   items: [
     {
-      kind: "choice",
+      kind: "slider",
       id: "MANIPULATION_IV2",
-      layout: "scale",
-      text: "How would you describe the overall tone of the pop-up message from the AI Workplace Assistant?",
+      text: "What did the feedback request message from the AI Workplace Assistant mainly rely on to encourage you to provide feedback?",
+      min: 1,
+      max: 6,
       minLabel:
-        "1 = Highly emotional and responsibility-focused<br /><span class='text-[12px] font-normal leading-tight text-slate-600'>(e.g., expressing worry about repeated mistakes and losing people’s confidence)</span>",
+        "1 = Emotional and responsibility-focused<br /><span class='text-[14px] font-normal leading-tight text-slate-600'>By suggesting that not giving feedback might allow the same mistake to affect others, and by emphasizing the user’s personal responsibility to share what happened from their side</span>",
       maxLabel:
-        "6 = Highly statistics-based and effectiveness-focused<br /><span class='text-[12px] font-normal leading-tight text-slate-600'>(e.g., mentioning numerical improvements such as higher completion rates and fewer errors)</span>",
-      options: Array.from({ length: 6 }, (_, index) => ({
-        value: index + 1,
-        label: String(index + 1),
-      })),
+        "6 = Statistics-based and effectiveness-focused<br /><span class='text-[14px] font-normal leading-tight text-slate-600'>By citing numerical improvements, such as a 24% increase in completion and a 31% reduction in errors, and by suggesting that feedback is effective in preventing errors.</span>",
+      defaultValue: 3.5,
+      step: 0.5,
+      showCurrentValue: true,
     },
   ],
 };
@@ -231,7 +231,7 @@ export const responseEfficacyQuestionGroup: LikertQuestionGroup = {
     },
     {
       id: "RESP_EFF_4",
-      text: "If I provide feedback, the AI assistant is less likely to make similar errors again.",
+      text: "If I provide feedback, the AI assistant is less likely to make errors again.",
     },
   ],
 };
@@ -242,19 +242,19 @@ export const guiltQuestionGroup: LikertQuestionGroup = {
   items: [
     {
       id: "GUILT_1",
-      text: "I would feel guilty if I didn’t provide user feedback to the AI assistant.",
+      text: "The message made me feel responsible for helping improve the AI Workplace Assistant by providing feedback.",
     },
     {
       id: "GUILT_2",
-      text: "I would feel sorry if I didn’t provide feedback to the AI assistant.",
+      text: "The message made me feel guilty about not providing feedback to the AI Workplace Assistant.",
     },
     {
       id: "GUILT_3",
-      text: "I would feel regretful if I didn’t provide feedback to the AI assistant.",
+      text: "The message made me feel responsible for other users who may be affected by similar issues with the AI Workplace Assistant.",
     },
     {
       id: "GUILT_4",
-      text: "I would have a bad conscience if I didn’t provide feedback to the AI assistant.",
+      text: "The message made me feel that if I did not provide feedback, similar issues might continue to affect other users partly because of me.",
     },
   ],
 };
@@ -282,6 +282,44 @@ export const utilityQuestionGroup: LikertQuestionGroup = {
     {
       id: "UTILITY_5",
       text: "I find that user feedback is critical for helping the AI Workplace Assistant achieve its goals.",
+    },
+  ],
+};
+
+export const perceivedBurdenQuestionGroup: LikertQuestionGroup = {
+  id: "perceived_burden",
+  title: "Perceived Burden",
+  items: [
+    {
+      id: "PERCEIVED_BURDEN_1",
+      text: "Providing feedback about the AI Workplace Assistant was burdensome.",
+    },
+    {
+      id: "PERCEIVED_BURDEN_2",
+      text: "Providing feedback about the AI Workplace Assistant interfered with my interaction with it.",
+    },
+    {
+      id: "PERCEIVED_BURDEN_3",
+      text: "Being asked to provide feedback about the AI Workplace Assistant was annoying.",
+    },
+  ],
+};
+
+export const perceivedPressureQuestionGroup: LikertQuestionGroup = {
+  id: "perceived_pressure",
+  title: "Perceived Pressure",
+  items: [
+    {
+      id: "PERCEIVED_PRESSURE_1",
+      text: "I feel pressure from the AI Workplace Assistant to provide feedback.",
+    },
+    {
+      id: "PERCEIVED_PRESSURE_2",
+      text: "The AI Workplace Assistant expects that I provide feedback.",
+    },
+    {
+      id: "PERCEIVED_PRESSURE_3",
+      text: "The AI Workplace Assistant values the feedback I provide.",
     },
   ],
 };

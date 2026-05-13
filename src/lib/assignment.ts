@@ -28,6 +28,31 @@ function normalize(value: QueryValue) {
     .toLowerCase();
 }
 
+function findRequestedAssignmentValue(
+  query: Record<string, QueryValue>,
+  key: "iv1" | "iv2",
+  allowedValues: string[],
+) {
+  const requestedValue = normalize(query[key]);
+  if (!requestedValue) {
+    return null;
+  }
+
+  const matchedValue =
+    allowedValues.find((candidate) => normalize(candidate) === requestedValue) ??
+    null;
+
+  if (!matchedValue) {
+    throw new Error(
+      `Invalid ${key} override: ${String(
+        Array.isArray(query[key]) ? query[key][0] : query[key],
+      )}`,
+    );
+  }
+
+  return matchedValue;
+}
+
 function randomPick<T>(values: T[]) {
   return values[crypto.randomInt(0, values.length)];
 }
@@ -35,6 +60,10 @@ function randomPick<T>(values: T[]) {
 function getLeastFrequent(counts: Record<string, number>) {
   const minimum = Math.min(...Object.values(counts));
   return Object.keys(counts).filter((key) => counts[key] === minimum);
+}
+
+function buildIvCellKey(iv1: string, iv2: string) {
+  return `${iv1}::${iv2}`;
 }
 
 async function pickBalancedValue(
@@ -67,6 +96,45 @@ async function pickBalancedValue(
   }
 
   return randomPick(getLeastFrequent(counts));
+}
+
+async function pickBalancedIvPair(iv1Values: string[], iv2Values: string[]) {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("progress")
+    .select("iv1, iv2")
+    .eq("pipeline_code", PIPELINE.code)
+    .eq("failed", false);
+
+  if (error) {
+    throw error;
+  }
+
+  const counts = Object.fromEntries(
+    iv1Values.flatMap((iv1) =>
+      iv2Values.map((iv2) => [buildIvCellKey(iv1, iv2), 0] as const),
+    ),
+  );
+
+  for (const row of data ?? []) {
+    if (typeof row.iv1 !== "string" || typeof row.iv2 !== "string") {
+      continue;
+    }
+
+    const key = buildIvCellKey(row.iv1, row.iv2);
+    if (key in counts) {
+      counts[key] += 1;
+    }
+  }
+
+  const selectedKey = randomPick(getLeastFrequent(counts));
+  const [iv1, iv2] = selectedKey.split("::");
+
+  if (!iv1 || !iv2) {
+    throw new Error("Unable to determine balanced IV assignment");
+  }
+
+  return { iv1, iv2 };
 }
 
 export async function cleanupAbandoned() {
@@ -154,10 +222,52 @@ export async function balancedPick(
   return randomPick(getLeastFrequent(counts));
 }
 
-export async function assignIV() {
+export async function assignIV(query: Record<string, QueryValue> = {}) {
+  const requestedIv1 = findRequestedAssignmentValue(
+    query,
+    "iv1",
+    PIPELINE.assign.iv1.values,
+  );
+  const requestedIv2 = findRequestedAssignmentValue(
+    query,
+    "iv2",
+    PIPELINE.assign.iv2.values,
+  );
+
+  if (requestedIv1 && requestedIv2) {
+    return { iv1: requestedIv1, iv2: requestedIv2 };
+  }
+
+  if (
+    PIPELINE.assign.iv1.mode === "balanced" &&
+    PIPELINE.assign.iv2.mode === "balanced"
+  ) {
+    const pickedPair = await pickBalancedIvPair(
+      PIPELINE.assign.iv1.values,
+      PIPELINE.assign.iv2.values,
+    );
+
+    return {
+      iv1: requestedIv1 ?? pickedPair.iv1,
+      iv2: requestedIv2 ?? pickedPair.iv2,
+    };
+  }
+
   const [iv1, iv2] = await Promise.all([
-    pickBalancedValue("iv1", PIPELINE.assign.iv1.mode, PIPELINE.assign.iv1.values),
-    pickBalancedValue("iv2", PIPELINE.assign.iv2.mode, PIPELINE.assign.iv2.values),
+    requestedIv1
+      ? Promise.resolve(requestedIv1)
+      : pickBalancedValue(
+          "iv1",
+          PIPELINE.assign.iv1.mode,
+          PIPELINE.assign.iv1.values,
+        ),
+    requestedIv2
+      ? Promise.resolve(requestedIv2)
+      : pickBalancedValue(
+          "iv2",
+          PIPELINE.assign.iv2.mode,
+          PIPELINE.assign.iv2.values,
+        ),
   ]);
 
   return { iv1, iv2 };
