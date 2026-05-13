@@ -40,7 +40,7 @@ const defaultDeps: SubmitHandlerDeps = {
   PROLIFIC_FAIL_URL,
 };
 
-const ABANDON_TIMEOUT_SECONDS = 30 * 60;
+const ABANDON_TIMEOUT_SECONDS = 50 * 60;
 
 function isAnswersRecord(value: unknown): value is JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
