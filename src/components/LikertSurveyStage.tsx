@@ -390,7 +390,7 @@ function SliderItem({
       </div>
 
       <div className="space-y-4">
-        <div className="flex items-start justify-between gap-4 text-[16px] font-medium text-slate-800">
+        <div className="flex items-start justify-between gap-4 text-[14px] font-medium text-slate-800">
           <span
             className="max-w-[45%] text-left font-medium"
             dangerouslySetInnerHTML={{ __html: question.minLabel }}
@@ -408,13 +408,11 @@ function SliderItem({
             max={question.max}
             step={question.step ?? 1}
             value={currentValue}
-            onPointerDown={() => {
-              if (!hasAnswered) {
-                onChange(question.id, currentValue);
-              }
-            }}
             onChange={(event) =>
-              onChange(question.id, Number(event.currentTarget.value))
+              onChange(
+                question.id,
+                Math.round(Number(event.currentTarget.value)),
+              )
             }
             className="slider-input h-3 w-full cursor-pointer appearance-none rounded-full bg-slate-200"
           />
@@ -453,7 +451,8 @@ function SliderItem({
 
         {!hasAnswered ? (
           <p className="text-[16px] text-slate-500 text-center">
-            Please answer by dragging the slider.
+            The slider starts in the middle. Please move it toward the number
+            that best matches your answer.
           </p>
         ) : null}
       </div>

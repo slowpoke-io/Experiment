@@ -153,8 +153,9 @@ const stage6InteractiveUi = buildInteractiveStageUI({
     A: {
       initialTitle: "Please Share Your Feedback",
       initialBody: [
-        "Something may have gone wrong. Without your feedback, I could repeat the same mistake in future tasks, which may frustrate other users and make them stop asking me for help.",
-        "Since you experienced this firsthand, only you can tell me what happened from your side.",
+        "Something may have gone wrong. I feel terrible that my mistake might have let you down.",
+        "Without your feedback, I’ll likely keep making the same mistake, negatively affecting other users and causing them to feel the same frustration and disappointment.",
+        "Since you experienced this firsthand, only you can tell me what happened from your side. I’m truly relying on your help to avoid failing others.",
         "If you’re willing, could you share your feedback about this experience?",
       ],
     },
@@ -162,7 +163,7 @@ const stage6InteractiveUi = buildInteractiveStageUI({
       initialTitle: "Please Share Your Feedback",
       initialBody: [
         "Over the past three months, feedback from users like you has increased task completion by 24%, reduced the error rate by 31%, and improved user satisfaction by 28%.",
-        "Your feedback is a direct and effective way to help improve the system and prevent future errors.",
+        "Evidence shows that your feedback is a direct and effective way to help the system identify and prevent future errors.",
         "If you’re willing, could you share your feedback about this experience?",
       ],
     },
@@ -258,6 +259,7 @@ function buildErrorNoticeStageUI(copy: {
   title: string;
   body: string[];
   progressiveReveal?: boolean;
+  initialVisibleParagraphs?: number;
 }) {
   return buildContentStageUI({
     title: "Before You Continue",
@@ -273,6 +275,7 @@ function buildErrorNoticeStageUI(copy: {
         title: copy.title,
         body: copy.body,
         progressiveReveal: copy.progressiveReveal ?? false,
+        initialVisibleParagraphs: copy.initialVisibleParagraphs,
         className: "mx-auto max-w-3xl px-7 py-8 text-center",
         headerClassName: "justify-center",
         titleClassName: "mx-auto max-w-2xl text-center",
@@ -296,12 +299,19 @@ function buildLikertAttentionQuestion(
   };
 }
 
-function buildSystemNoticeManipulationQuestionGroup(): LikertQuestionGroup {
+function buildSystemNoticeManipulationQuestionGroup(
+  iv1: "A" | "B",
+): LikertQuestionGroup {
+  const imageSrc =
+    iv1 === "A" ? "/system_notice_A.png" : "/system_notice_B.png";
+
   return {
     id: "manipulation_iv1",
     title: "About the System Notice",
-    description:
+    description: [
       "Please answer the following item based on the <strong class='text-underline underline-teal'>System Notice</strong> shown before the video and interaction.",
+      `<img src="${imageSrc}" alt="System Notice condition ${iv1}" style="display:block;width:100%;max-width:40rem;height:auto;margin-top:1rem;border:1px solid rgba(203,213,225,1);border-radius:1rem;margin-inline:auto;" />`,
+    ].join(" "),
     show: true,
     items: [
       {
@@ -309,8 +319,8 @@ function buildSystemNoticeManipulationQuestionGroup(): LikertQuestionGroup {
         id: "MANIPULATION_IV1",
         text: "The <strong>System Notice</strong> stated that early-use issues did not mean that the AI assistant was incapable.",
         options: [
-          { value: "yes", label: "Yes" },
-          { value: "no", label: "No" },
+          { value: "yes", label: "Yes  (The notice explicitly stated this)" },
+          { value: "no", label: "No  (The notice did not mention this)" },
           { value: "dont_recall", label: "I don&rsquo;t recall" },
         ],
       },
@@ -939,13 +949,13 @@ const stage7QuestionSections: LikertQuestionSection[] = [
   },
 ];
 
-function buildPostMeasureQuestionSections() {
+function buildPostMeasureQuestionSections(iv1: "A" | "B") {
   return [
     {
       id: "manipulation_checks",
       // title: "Manipulation Checks",
       groups: [
-        buildSystemNoticeManipulationQuestionGroup(),
+        buildSystemNoticeManipulationQuestionGroup(iv1),
         manipulationIV2QuestionGroup,
       ],
     },
@@ -1103,10 +1113,11 @@ export const PIPELINE: PipelineConfig = {
           title: "System Notice",
           body: [
             "The AI Workplace Assistant has been newly introduced and may occasionally encounter issues during early use.",
-            "However, <strong>this should not be taken as evidence that the assistant lacks overall capability.</strong>",
+            "<strong>However, this should not be taken as evidence that the assistant lacks overall capability.</strong>",
             "If your request does not go through, you may try again later or contact the AI support team for assistance.",
           ],
           progressiveReveal: true,
+          initialVisibleParagraphs: 1,
         }),
       },
       params: {},
@@ -1191,7 +1202,7 @@ export const PIPELINE: PipelineConfig = {
           instructions: [
             "Use the following scale to indicate how strongly you agree with each statement.",
           ],
-          questionSections: buildPostMeasureQuestionSections(),
+          questionSections: buildPostMeasureQuestionSections("A"),
           submitLabel: "Submit",
           accent: "slate",
         }),
@@ -1203,7 +1214,7 @@ export const PIPELINE: PipelineConfig = {
           instructions: [
             "Use the following scale to indicate how strongly you agree with each statement.",
           ],
-          questionSections: buildPostMeasureQuestionSections(),
+          questionSections: buildPostMeasureQuestionSections("B"),
           submitLabel: "Submit",
           accent: "slate",
         }),

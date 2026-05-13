@@ -81,7 +81,7 @@ export function ConsentPanel({ prolificId, sharedQuery }: ConsentPanelProps) {
             <p>
               You are invited to participate in a research study examining how
               people perceive and interpret information. The study will take
-              approximately <strong>8–12 minutes</strong> to complete.
+              approximately <strong>10–15 minutes</strong> to complete.
             </p>
           </section>
 
@@ -93,8 +93,7 @@ export function ConsentPanel({ prolificId, sharedQuery }: ConsentPanelProps) {
               You will complete a series of tasks and questionnaires. Please
               read each item carefully and respond as accurately as possible.
               Some items will ask about your opinions, experiences, or
-              perceptions. There are no right or wrong answers, so please
-              respond honestly and thoughtfully based on your own views.
+              perceptions.
             </p>
           </section>
 
@@ -129,11 +128,6 @@ export function ConsentPanel({ prolificId, sharedQuery }: ConsentPanelProps) {
               <p>
                 This task requires a <strong>high level of engagement</strong>.
               </p>
-              <p>
-                You will be automatically redirected to Prolific to{" "}
-                <strong>return your slot without compensation</strong> if any of
-                the following occur:
-              </p>
             </div>
             <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm">
               <div className="mb-4 flex items-center gap-3">
@@ -157,12 +151,12 @@ export function ConsentPanel({ prolificId, sharedQuery }: ConsentPanelProps) {
                   <h3 className="text-lg font-semibold text-slate-950">
                     Participation Requirements
                   </h3>
-                  {/* <p className="body-copy-compact">
-                    Low-quality or incomplete participation will be returned to
-                    Prolific without compensation.
-                  </p> */}
                 </div>
               </div>
+              <p className="body-copy-compact font-medium">
+                You will be automatically redirected to Prolific to return your
+                slot without compensation if any of the following occur:
+              </p>
 
               <ul className="mt-5 space-y-3">
                 <li className="flex gap-2">
@@ -206,8 +200,8 @@ export function ConsentPanel({ prolificId, sharedQuery }: ConsentPanelProps) {
             By clicking <strong>&quot;I Agree&quot;</strong> below, you confirm
             that you have read and understood the information above, including
             the attention, timing, and activity requirements. You verify that
-            you are at least 18 years old and voluntarily agree to participate
-            in this study under these conditions.
+            you are voluntarily agree to participate in this study under these
+            conditions.
           </div>
 
           {errorMessage ? (

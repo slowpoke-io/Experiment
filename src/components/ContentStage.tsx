@@ -22,7 +22,18 @@ export function ContentStage({
 }: ContentStageProps) {
   function getInitialRevealCount(pageIndex: number) {
     const targetPage = ui.pages[pageIndex];
-    return targetPage?.progressiveReveal ? 0 : (targetPage?.body.length ?? 0);
+    if (!targetPage) {
+      return 0;
+    }
+
+    if (!targetPage.progressiveReveal) {
+      return targetPage.body.length;
+    }
+
+    return Math.min(
+      targetPage.initialVisibleParagraphs ?? 0,
+      targetPage.body.length,
+    );
   }
 
   const [currentPage, setCurrentPage] = useState(0);

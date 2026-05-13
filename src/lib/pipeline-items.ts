@@ -177,18 +177,18 @@ export const manipulationIV2QuestionGroup: LikertQuestionGroup = {
   show: true,
   items: [
     {
-      kind: "choice",
+      kind: "slider",
       id: "MANIPULATION_IV2",
-      layout: "scale",
       text: "What did the feedback request message from the AI Workplace Assistant mainly rely on to encourage you to provide feedback?",
+      min: 1,
+      max: 6,
       minLabel:
-        "1 = More emotional and responsibility-focused<br /><span class='text-[14px] font-normal leading-tight text-slate-600'>by emphasizing an individual responsibility to share one’s side of the experience, and by suggesting that not responding might allow the same issue to affect others.</span>",
+        "1 = Emotional and responsibility-focused<br /><span class='text-[14px] font-normal leading-tight text-slate-600'>By suggesting that not giving feedback might allow the same mistake to affect others, and by emphasizing the user’s personal responsibility to share what happened from their side</span>",
       maxLabel:
-        "6 = More statistics-based and effectiveness-focused<br /><span class='text-[14px] font-normal leading-tight text-slate-600'>By citing numerical improvements, such as a 24% increase in completion and a 31% reduction in errors, and by suggesting that feedback is effective in preventing failures.</span>",
-      options: Array.from({ length: 6 }, (_, index) => ({
-        value: index + 1,
-        label: String(index + 1),
-      })),
+        "6 = Statistics-based and effectiveness-focused<br /><span class='text-[14px] font-normal leading-tight text-slate-600'>By citing numerical improvements, such as a 24% increase in completion and a 31% reduction in errors, and by suggesting that feedback is effective in preventing errors.</span>",
+      defaultValue: 3.5,
+      step: 0.5,
+      showCurrentValue: true,
     },
   ],
 };

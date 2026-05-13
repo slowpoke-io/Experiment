@@ -115,6 +115,7 @@ export type ContentPage = {
   title: string;
   body: string[];
   progressiveReveal?: boolean;
+  initialVisibleParagraphs?: number;
   footerInstructions?: string[];
   className?: string;
   headerClassName?: string;
