@@ -172,20 +172,22 @@ export const scsInterdependentQuestions: LikertQuestion[] = [
 export const manipulationIV2QuestionGroup: LikertQuestionGroup = {
   id: "manipulation_iv2",
   title: "About the Pop-up Message",
-  description:
-    "Please answer the following items based on the <strong class='text-underline underline-indigo'>Feedback Request Message (Pop-up)</strong> shown by the AI Workplace Assistant during your interaction with it.",
+  description: [
+    "Please refer to the feedback request pop-up from the AI Workplace Assistant that you just encountered and answer the question below.",
+    '<img src="/feedback_popup.png" alt="Feedback request pop-up" style="display:block;width:100%;max-width:20rem;height:auto;margin-top:1rem;border:1px solid rgba(203,213,225,1);border-radius:1rem;margin-inline:auto;" />',
+  ].join(" "),
   show: true,
   items: [
     {
       kind: "slider",
       id: "MANIPULATION_IV2",
-      text: "What did the feedback request message from the AI Workplace Assistant mainly rely on to encourage you to provide feedback?",
+      text: "Which description is closer to what the feedback request message mainly relied on to encourage you to provide feedback?",
       min: 1,
       max: 6,
       minLabel:
-        "1 = Emotional and responsibility-focused<br /><span class='text-[14px] font-normal leading-tight text-slate-600'>By suggesting that not giving feedback might allow the same mistake to affect others, and by emphasizing the user’s personal responsibility to share what happened from their side</span>",
+        "<span class='text-slate-600'>1 = Statistics-based and effectiveness-focused</span><br /><span class='text-[14px] font-normal leading-tight'>Citing <strong>numerical evidence</strong>, such as a <strong>24% increase in completion</strong> and a <strong>31% reduction in errors</strong>, and suggesting that feedback is <strong>effective</strong> in preventing errors.</span>",
       maxLabel:
-        "6 = Statistics-based and effectiveness-focused<br /><span class='text-[14px] font-normal leading-tight text-slate-600'>By citing numerical improvements, such as a 24% increase in completion and a 31% reduction in errors, and by suggesting that feedback is effective in preventing errors.</span>",
+        "<span class='text-slate-600'>6 = Emotional and responsibility-focused</span><br /><span class='text-[14px] font-normal leading-tight'>Suggesting that <strong>without the user&rsquo;s feedback</strong>, the same mistake may <strong>cause inconvenience or frustration for other users</strong>, and that <strong>only the user</strong> can help prevent it from <strong>affecting others</strong>.</span>",
       defaultValue: 3.5,
       step: 0.5,
       showCurrentValue: true,

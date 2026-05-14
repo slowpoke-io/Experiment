@@ -151,16 +151,15 @@ const stage6InteractiveUi = buildInteractiveStageUI({
   },
   popupByIv2: {
     A: {
-      initialTitle: "Please Share Your Feedback",
+      initialTitle: "Share Your Feedback",
       initialBody: [
-        "Something may have gone wrong. I feel terrible that my mistake might have let you down.",
-        "Without your feedback, I’ll likely keep making the same mistake, negatively affecting other users and causing them to feel the same frustration and disappointment.",
-        "Since you experienced this firsthand, only you can tell me what happened from your side. I’m truly relying on your help to avoid failing others.",
-        "If you’re willing, could you share your feedback about this experience?",
+        "Something may have gone wrong. Without your feedback, I could repeat the same mistake in future tasks, which may cause inconvenience or frustration for other users.",
+        "Since you are the one who actually experienced this issue, only you can help me understand it and prevent it from affecting others.",
+        "If you’re willing, Could you share your feedback about this experience?",
       ],
     },
     B: {
-      initialTitle: "Please Share Your Feedback",
+      initialTitle: "Share Your Feedback",
       initialBody: [
         "Over the past three months, feedback from users like you has increased task completion by 24%, reduced the error rate by 31%, and improved user satisfaction by 28%.",
         "Evidence shows that your feedback is a direct and effective way to help the system identify and prevent future errors.",
@@ -309,7 +308,7 @@ function buildSystemNoticeManipulationQuestionGroup(
     id: "manipulation_iv1",
     title: "About the System Notice",
     description: [
-      "Please answer the following item based on the <strong class='text-underline underline-teal'>System Notice</strong> shown before the video and interaction.",
+      "Please refer to the <strong class='text-underline underline-teal'>System Notice</strong> shown before the video and interaction, and answer the question below.",
       `<img src="${imageSrc}" alt="System Notice condition ${iv1}" style="display:block;width:100%;max-width:40rem;height:auto;margin-top:1rem;border:1px solid rgba(203,213,225,1);border-radius:1rem;margin-inline:auto;" />`,
     ].join(" "),
     show: true,
@@ -317,7 +316,7 @@ function buildSystemNoticeManipulationQuestionGroup(
       {
         kind: "choice",
         id: "MANIPULATION_IV1",
-        text: "The <strong>System Notice</strong> stated that early-use issues did not mean that the AI assistant was incapable.",
+        text: "The <strong>System Notice</strong> stated that early-use issues <strong>DID NOT mean that the AI assistant was incapable</strong>.",
         options: [
           { value: "yes", label: "Yes  (The notice explicitly stated this)" },
           { value: "no", label: "No  (The notice did not mention this)" },

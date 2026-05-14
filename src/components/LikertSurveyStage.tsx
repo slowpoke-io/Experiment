@@ -449,12 +449,10 @@ function SliderItem({
           })}
         </div>
 
-        {!hasAnswered ? (
-          <p className="text-[16px] text-slate-500 text-center">
-            The slider starts in the middle. Please move it toward the number
-            that best matches your answer.
-          </p>
-        ) : null}
+        <p className="text-[16px] text-slate-500 text-center">
+          The slider starts in the middle. Please move it toward the number
+          that best matches the message.
+        </p>
       </div>
     </div>
   );
