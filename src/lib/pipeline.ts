@@ -19,6 +19,7 @@ import {
   aiPositionGroupTemplates,
   finalFeedbackQuestionGroup,
   guiltQuestionGroup,
+  antiGuiltQuestionGroup,
   perceivedBurdenQuestionGroup,
   perceivedPressureQuestionGroup,
   manipulationIV2QuestionGroup,
@@ -966,6 +967,7 @@ function buildPostMeasureQuestionSections(iv1: "A" | "B") {
       groups: [
         responseEfficacyQuestionGroup,
         guiltQuestionGroup,
+        antiGuiltQuestionGroup,
         utilityQuestionGroup,
         perceivedPressureQuestionGroup,
         perceivedBurdenQuestionGroup,
@@ -984,7 +986,7 @@ export const PIPELINE: PipelineConfig = {
   stages: [
     {
       id: "stage_1",
-      active: true,
+      active: false,
       variant: {
         mode: "random",
         value: ["default"],
