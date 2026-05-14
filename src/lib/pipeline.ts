@@ -976,7 +976,7 @@ function buildPostMeasureQuestionSections(iv1: "A" | "B") {
 }
 
 export const PIPELINE: PipelineConfig = {
-  code: "pilot_0513",
+  code: "pilot_0515",
   assign: {
     iv1: { mode: "balanced", values: ["A", "B"] },
     iv2: { mode: "balanced", values: ["A", "B"] },
