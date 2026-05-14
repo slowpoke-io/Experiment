@@ -317,7 +317,7 @@ function buildSystemNoticeManipulationQuestionGroup(
       {
         kind: "choice",
         id: "MANIPULATION_IV1",
-        text: "The <strong>System Notice</strong> stated that early-use issues <strong>DID NOT mean that the AI assistant was incapable</strong>.",
+        text: "The <strong>System Notice</strong> stated that early-use issues <strong><span class='font-bold'>DID NOT</span> mean that the AI assistant was incapable</strong>.",
         options: [
           { value: "yes", label: "Yes  (The notice explicitly stated this)" },
           { value: "no", label: "No  (The notice did not mention this)" },
