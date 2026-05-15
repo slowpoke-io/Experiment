@@ -146,8 +146,8 @@ const stage6InteractiveUi = buildInteractiveStageUI({
     body: [
       "<p>Please share your feedback on the AI Workplace Assistant regarding:</p><ul><li>how well it understood your request</li><li>the quality of its responses</li><li>how it handled and completed the task</li><li>any issues you encountered</li><li>any areas for improvement</li></ul>",
     ],
-    placeholder: "optional",
-    submitLabel: "Submit / Next",
+    placeholder: "Optional",
+    submitLabel: "Submit / Skip",
     submitDelaySeconds: STAGE_WAIT_SECONDS.stage6FeedbackSubmit,
   },
   popupByIv2: {
@@ -985,37 +985,6 @@ export const PIPELINE: PipelineConfig = {
   },
   stages: [
     {
-      id: "stage_1",
-      active: false,
-      variant: {
-        mode: "random",
-        value: ["default"],
-      },
-      validator: {
-        default: "attention_checks",
-      },
-      ui: {
-        default: buildLikertStageUI({
-          title: "Questionnaire 1",
-          // description:
-          // "Please answer the following self-construal items based on your general tendencies.",
-          introTitle: "Instructions",
-          instructions: [
-            "Please indicate how strongly you agree or disagree with each statement about yourself.",
-            "Answer every item before moving to the next page.",
-            "Use your immediate impression rather than overthinking each response.",
-          ],
-          questionGroups: stage1QuestionGroups,
-          submitLabel: "Continue",
-          accent: "indigo",
-          groupsPerPage: 1,
-        }),
-      },
-      params: {
-        default: buildAttentionParams(stage1AttentionChecks),
-      },
-    },
-    {
       id: "stage_2",
       active: true,
       variant: {
@@ -1231,6 +1200,37 @@ export const PIPELINE: PipelineConfig = {
           ...postExperienceOutcomesAttentionChecks,
           ...postFailureReactionsAttentionChecks,
         ]),
+      },
+    },
+    {
+      id: "stage_1",
+      active: true,
+      variant: {
+        mode: "random",
+        value: ["default"],
+      },
+      validator: {
+        default: "attention_checks",
+      },
+      ui: {
+        default: buildLikertStageUI({
+          title: "Questionnaire",
+          // description:
+          // "Please answer the following self-construal items based on your general tendencies.",
+          introTitle: "Instructions",
+          instructions: [
+            "Please indicate how strongly you agree or disagree with each statement about yourself.",
+            "Answer every item before moving to the next page.",
+            "Use your immediate impression rather than overthinking each response.",
+          ],
+          questionGroups: stage1QuestionGroups,
+          submitLabel: "Continue",
+          accent: "indigo",
+          groupsPerPage: 1,
+        }),
+      },
+      params: {
+        default: buildAttentionParams(stage1AttentionChecks),
       },
     },
   ],
