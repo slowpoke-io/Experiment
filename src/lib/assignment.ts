@@ -21,6 +21,9 @@ type StratifyBy =
   | { stageVariant: string; value: string | undefined }
   | null;
 
+const FORCE_IV1: "A" | "B" | null = null;
+const FORCE_IV2: "A" | "B" | null = null;
+
 function normalize(value: QueryValue) {
   const raw = Array.isArray(value) ? value[0] : value;
   return String(raw ?? "")
@@ -39,8 +42,9 @@ function findRequestedAssignmentValue(
   }
 
   const matchedValue =
-    allowedValues.find((candidate) => normalize(candidate) === requestedValue) ??
-    null;
+    allowedValues.find(
+      (candidate) => normalize(candidate) === requestedValue,
+    ) ?? null;
 
   if (!matchedValue) {
     throw new Error(
@@ -204,9 +208,10 @@ export async function balancedPick(
 
   for (const row of data ?? []) {
     if (stratifyBy) {
-      const actual = "column" in stratifyBy
-        ? row[stratifyBy.column]
-        : row.stage_variants?.[stratifyBy.stageVariant];
+      const actual =
+        "column" in stratifyBy
+          ? row[stratifyBy.column]
+          : row.stage_variants?.[stratifyBy.stageVariant];
 
       if (actual !== stratifyBy.value) {
         continue;
@@ -223,6 +228,10 @@ export async function balancedPick(
 }
 
 export async function assignIV(query: Record<string, QueryValue> = {}) {
+  if (FORCE_IV1 && FORCE_IV2) {
+    return { iv1: FORCE_IV1, iv2: FORCE_IV2 };
+  }
+
   const requestedIv1 = findRequestedAssignmentValue(
     query,
     "iv1",
@@ -287,8 +296,9 @@ async function pickVariant(
     const requestedVariant = normalize(query[variant.queryKey]);
     if (requestedVariant) {
       variantId =
-        allVariants.find((candidate) => normalize(candidate) === requestedVariant) ??
-        null;
+        allVariants.find(
+          (candidate) => normalize(candidate) === requestedVariant,
+        ) ?? null;
     }
   }
 

@@ -19,6 +19,7 @@ import {
   aiPositionGroupTemplates,
   finalFeedbackQuestionGroup,
   guiltQuestionGroup,
+  antiGuiltQuestionGroup,
   perceivedBurdenQuestionGroup,
   perceivedPressureQuestionGroup,
   manipulationIV2QuestionGroup,
@@ -145,8 +146,8 @@ const stage6InteractiveUi = buildInteractiveStageUI({
     body: [
       "<p>Please share your feedback on the AI Workplace Assistant regarding:</p><ul><li>how well it understood your request</li><li>the quality of its responses</li><li>how it handled and completed the task</li><li>any issues you encountered</li><li>any areas for improvement</li></ul>",
     ],
-    placeholder: "optional",
-    submitLabel: "Submit / Next",
+    placeholder: "Optional",
+    submitLabel: "Submit / Skip",
     submitDelaySeconds: STAGE_WAIT_SECONDS.stage6FeedbackSubmit,
   },
   popupByIv2: {
@@ -316,7 +317,7 @@ function buildSystemNoticeManipulationQuestionGroup(
       {
         kind: "choice",
         id: "MANIPULATION_IV1",
-        text: "The <strong>System Notice</strong> stated that early-use issues <strong>DID NOT mean that the AI assistant was incapable</strong>.",
+        text: "The <strong>System Notice</strong> stated that early-use issues <strong><span class='font-bold'>DID NOT</span> mean that the AI assistant was incapable</strong>.",
         options: [
           { value: "yes", label: "Yes  (The notice explicitly stated this)" },
           { value: "no", label: "No  (The notice did not mention this)" },
@@ -966,6 +967,7 @@ function buildPostMeasureQuestionSections(iv1: "A" | "B") {
       groups: [
         responseEfficacyQuestionGroup,
         guiltQuestionGroup,
+        antiGuiltQuestionGroup,
         utilityQuestionGroup,
         perceivedPressureQuestionGroup,
         perceivedBurdenQuestionGroup,
@@ -976,43 +978,12 @@ function buildPostMeasureQuestionSections(iv1: "A" | "B") {
 }
 
 export const PIPELINE: PipelineConfig = {
-  code: "pilot_0513",
+  code: "pilot_0515",
   assign: {
     iv1: { mode: "balanced", values: ["A", "B"] },
     iv2: { mode: "balanced", values: ["A", "B"] },
   },
   stages: [
-    {
-      id: "stage_1",
-      active: true,
-      variant: {
-        mode: "random",
-        value: ["default"],
-      },
-      validator: {
-        default: "attention_checks",
-      },
-      ui: {
-        default: buildLikertStageUI({
-          title: "Questionnaire 1",
-          // description:
-          // "Please answer the following self-construal items based on your general tendencies.",
-          introTitle: "Instructions",
-          instructions: [
-            "Please indicate how strongly you agree or disagree with each statement about yourself.",
-            "Answer every item before moving to the next page.",
-            "Use your immediate impression rather than overthinking each response.",
-          ],
-          questionGroups: stage1QuestionGroups,
-          submitLabel: "Continue",
-          accent: "indigo",
-          groupsPerPage: 1,
-        }),
-      },
-      params: {
-        default: buildAttentionParams(stage1AttentionChecks),
-      },
-    },
     {
       id: "stage_2",
       active: true,
@@ -1229,6 +1200,37 @@ export const PIPELINE: PipelineConfig = {
           ...postExperienceOutcomesAttentionChecks,
           ...postFailureReactionsAttentionChecks,
         ]),
+      },
+    },
+    {
+      id: "stage_1",
+      active: true,
+      variant: {
+        mode: "random",
+        value: ["default"],
+      },
+      validator: {
+        default: "attention_checks",
+      },
+      ui: {
+        default: buildLikertStageUI({
+          title: "Questionnaire",
+          // description:
+          // "Please answer the following self-construal items based on your general tendencies.",
+          introTitle: "Instructions",
+          instructions: [
+            "Please indicate how strongly you agree or disagree with each statement about yourself.",
+            "Answer every item before moving to the next page.",
+            "Use your immediate impression rather than overthinking each response.",
+          ],
+          questionGroups: stage1QuestionGroups,
+          submitLabel: "Continue",
+          accent: "indigo",
+          groupsPerPage: 1,
+        }),
+      },
+      params: {
+        default: buildAttentionParams(stage1AttentionChecks),
       },
     },
   ],

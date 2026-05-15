@@ -261,6 +261,29 @@ export const guiltQuestionGroup: LikertQuestionGroup = {
   ],
 };
 
+export const antiGuiltQuestionGroup: LikertQuestionGroup = {
+  id: "anti_guilt",
+  title: "ANTI_GUILT",
+  items: [
+    {
+      id: "ANTI_GUILT_1",
+      text: "I would feel guilty if I didn’t provide user feedback to the AI assistant.",
+    },
+    {
+      id: "ANTI_GUILT_2",
+      text: "I would feel sorry if I didn’t provide feedback to the AI assistant.",
+    },
+    {
+      id: "ANTI_GUILT_3",
+      text: "I would feel regretful if I didn’t provide feedback to the AI assistant.",
+    },
+    {
+      id: "ANTI_GUILT_4",
+      text: "I would have a bad conscience if I didn’t provide feedback to the AI assistant.",
+    },
+  ],
+};
+
 export const utilityQuestionGroup: LikertQuestionGroup = {
   id: "utility",
   title: "Utility",
