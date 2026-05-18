@@ -7,6 +7,7 @@ import type {
   AdminDetailRow,
   AdminParticipantDetailResponse,
   AdminStatus,
+  AdminStatusSummary,
   ApiErrorResponse,
 } from "@/lib/types";
 
@@ -27,30 +28,30 @@ type OrderDirection = "asc" | "desc";
 
 const statusMeta: Record<
   AdminStatus,
-  { label: string; cardClass: string; chipClass: string }
+  { label: string; cardClass: string; chipClass: string; dotClass: string }
 > = {
   in_progress: {
     label: "In Progress",
-    cardClass: "border-amber-200 bg-amber-50/80",
+    cardClass: "border-amber-200 bg-amber-50/60",
     chipClass: "border-amber-300 bg-amber-100 text-amber-800",
+    dotClass: "bg-amber-400",
   },
   failed: {
     label: "Failed",
-    cardClass: "border-red-200 bg-red-50/80",
+    cardClass: "border-red-200 bg-red-50/60",
     chipClass: "border-red-300 bg-red-100 text-red-800",
+    dotClass: "bg-red-400",
   },
   completed: {
-    label: "Success",
-    cardClass: "border-emerald-200 bg-emerald-50/80",
+    label: "Completed",
+    cardClass: "border-emerald-200 bg-emerald-50/60",
     chipClass: "border-emerald-300 bg-emerald-100 text-emerald-800",
+    dotClass: "bg-emerald-400",
   },
 };
 
 function formatDateTime(value: string | null) {
-  if (!value) {
-    return "—";
-  }
-
+  if (!value) return "—";
   return new Intl.DateTimeFormat("en-US", {
     year: "numeric",
     month: "short",
@@ -62,46 +63,48 @@ function formatDateTime(value: string | null) {
 }
 
 function formatDuration(seconds: number | null) {
-  if (seconds === null) {
-    return "—";
-  }
-
+  if (seconds === null) return "—";
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const remainingSeconds = seconds % 60;
-
-  if (hours > 0) {
-    return `${hours}h ${minutes}m ${remainingSeconds}s`;
-  }
-
-  if (minutes > 0) {
-    return `${minutes}m ${remainingSeconds}s`;
-  }
-
+  if (hours > 0) return `${hours}h ${minutes}m ${remainingSeconds}s`;
+  if (minutes > 0) return `${minutes}m ${remainingSeconds}s`;
   return `${remainingSeconds}s`;
 }
 
-function renderBreakdownTable(
-  breakdown: { iv1: string; iv2: string; count: number }[],
-  keyPrefix: string,
-) {
+function formatJson(value: unknown) {
+  return JSON.stringify(value, null, 2);
+}
+
+function IvBreakdownGrid({
+  breakdown,
+  keyPrefix,
+}: {
+  breakdown: { iv1: string; iv2: string; count: number }[];
+  keyPrefix: string;
+}) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-56 text-sm">
+    <div className="mt-4 overflow-hidden rounded-[1.1rem] border border-white/60 bg-white/60">
+      <table className="w-full text-sm">
         <thead>
-          <tr className="text-slate-500">
-            <th className="px-3 py-2 text-left">IV1 \ IV2</th>
-            <th className="px-3 py-2 text-center">A</th>
-            <th className="px-3 py-2 text-center">B</th>
+          <tr className="border-b border-slate-200/60">
+            <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">
+              IV1 ╲ IV2
+            </th>
+            <th className="px-3 py-2 text-center text-xs font-semibold text-slate-500">
+              A
+            </th>
+            <th className="px-3 py-2 text-center text-xs font-semibold text-slate-500">
+              B
+            </th>
           </tr>
         </thead>
         <tbody>
           {["A", "B"].map((iv1) => (
-            <tr
-              key={`${keyPrefix}-${iv1}`}
-              className="border-t border-slate-200/80"
-            >
-              <td className="px-3 py-2 font-semibold text-slate-700">{iv1}</td>
+            <tr key={`${keyPrefix}-${iv1}`} className="border-t border-slate-200/40">
+              <td className="px-3 py-2 text-xs font-semibold text-slate-600">
+                {iv1}
+              </td>
               {["A", "B"].map((iv2) => {
                 const cell = breakdown.find(
                   (entry) => entry.iv1 === iv1 && entry.iv2 === iv2,
@@ -109,7 +112,7 @@ function renderBreakdownTable(
                 return (
                   <td
                     key={`${keyPrefix}-${iv1}-${iv2}`}
-                    className="px-3 py-2 text-center font-medium text-slate-900"
+                    className="px-3 py-2 text-center text-sm font-semibold text-slate-900"
                   >
                     {cell?.count ?? 0}
                   </td>
@@ -123,8 +126,35 @@ function renderBreakdownTable(
   );
 }
 
-function formatJson(value: unknown) {
-  return JSON.stringify(value, null, 2);
+function StatusCard({
+  status,
+  summary,
+}: {
+  status: AdminStatus;
+  summary: AdminStatusSummary;
+}) {
+  const meta = statusMeta[status];
+  return (
+    <div className={`rounded-[1.75rem] border p-5 ${meta.cardClass}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className={`h-2 w-2 rounded-full ${meta.dotClass}`} />
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">
+              {meta.label}
+            </span>
+          </div>
+          <div className="mt-2 text-4xl font-semibold tracking-tight text-slate-950">
+            {summary.total}
+          </div>
+        </div>
+        <span className="rounded-full border border-white/70 bg-white/60 px-2.5 py-1 text-xs font-semibold text-slate-500">
+          n
+        </span>
+      </div>
+      <IvBreakdownGrid breakdown={summary.breakdown} keyPrefix={status} />
+    </div>
+  );
 }
 
 function getDisplayedStageVariants(participant: AdminDetailRow) {
@@ -136,9 +166,10 @@ function getDisplayedStageVariants(participant: AdminDetailRow) {
     return participant.stage_variants;
   }
 
-  const stageVariants = {
-    ...participant.stage_variants,
-  } as Record<string, unknown>;
+  const stageVariants = { ...participant.stage_variants } as Record<
+    string,
+    unknown
+  >;
 
   if (
     (stageVariants.stage_6 === "default" ||
@@ -158,7 +189,6 @@ export function AdminDashboard({ initialData, onLogout }: AdminDashboardProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
-  const [summaryExpanded, setSummaryExpanded] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [statusFilter, setStatusFilter] = useState<AdminStatus | "all">("all");
   const [iv1Filter, setIv1Filter] = useState<"all" | "A" | "B">("all");
@@ -179,22 +209,10 @@ export function AdminDashboard({ initialData, onLogout }: AdminDashboardProps) {
     const normalizedSearch = searchText.trim().toLowerCase();
 
     const rows = dashboardData.rows.filter((row) => {
-      if (statusFilter !== "all" && row.status !== statusFilter) {
-        return false;
-      }
-
-      if (iv1Filter !== "all" && row.iv1 !== iv1Filter) {
-        return false;
-      }
-
-      if (iv2Filter !== "all" && row.iv2 !== iv2Filter) {
-        return false;
-      }
-
-      if (!normalizedSearch) {
-        return true;
-      }
-
+      if (statusFilter !== "all" && row.status !== statusFilter) return false;
+      if (iv1Filter !== "all" && row.iv1 !== iv1Filter) return false;
+      if (iv2Filter !== "all" && row.iv2 !== iv2Filter) return false;
+      if (!normalizedSearch) return true;
       return (
         row.prolific_id.toLowerCase().includes(normalizedSearch) ||
         row.failed_reason_summary?.toLowerCase().includes(normalizedSearch) ||
@@ -203,26 +221,17 @@ export function AdminDashboard({ initialData, onLogout }: AdminDashboardProps) {
       );
     });
 
-    const sortedRows = [...rows].sort((left, right) => {
+    return [...rows].sort((left, right) => {
       const leftValue = left[orderField];
       const rightValue = right[orderField];
-
-      if (leftValue === rightValue) {
-        return 0;
-      }
-
+      if (leftValue === rightValue) return 0;
       const leftComparable = leftValue ?? (orderDirection === "asc" ? "" : -1);
       const rightComparable =
         rightValue ?? (orderDirection === "asc" ? "" : -1);
-
-      if (leftComparable < rightComparable) {
+      if (leftComparable < rightComparable)
         return orderDirection === "asc" ? -1 : 1;
-      }
-
       return orderDirection === "asc" ? 1 : -1;
     });
-
-    return sortedRows;
   }, [
     dashboardData.rows,
     iv1Filter,
@@ -244,13 +253,11 @@ export function AdminDashboard({ initialData, onLogout }: AdminDashboardProps) {
       const payload = (await response.json()) as
         | AdminDashboardResponse
         | ApiErrorResponse;
-
       if (!response.ok || !payload.ok) {
         throw new Error(
           "message" in payload ? payload.message : "Unable to load dashboard.",
         );
       }
-
       setDashboardData(payload);
     } catch (error) {
       setDetailError(
@@ -265,13 +272,8 @@ export function AdminDashboard({ initialData, onLogout }: AdminDashboardProps) {
     setSelectedProlificId(prolificId);
     setDetailError(null);
     setDetailTab("answers");
-
-    if (detailCache[prolificId]) {
-      return;
-    }
-
+    if (detailCache[prolificId]) return;
     setLoadingDetail(true);
-
     try {
       const response = await fetch(
         `/api/admin/participant?prolificId=${encodeURIComponent(prolificId)}`,
@@ -279,13 +281,11 @@ export function AdminDashboard({ initialData, onLogout }: AdminDashboardProps) {
       const payload = (await response.json()) as
         | AdminParticipantDetailResponse
         | ApiErrorResponse;
-
       if (!response.ok || !payload.ok) {
         throw new Error(
           "message" in payload ? payload.message : "Unable to load detail.",
         );
       }
-
       setDetailCache((previous) => ({
         ...previous,
         [prolificId]: payload.participant,
@@ -304,27 +304,34 @@ export function AdminDashboard({ initialData, onLogout }: AdminDashboardProps) {
     onLogout();
   }
 
+  const { summary } = dashboardData;
+  const total =
+    summary.in_progress.total + summary.failed.total + summary.completed.total;
+
   return (
     <>
       <div className="mx-auto flex min-h-svh w-full max-w-7xl flex-col gap-6 px-5 py-6 sm:px-8 lg:px-10">
+        {/* Header */}
         <div className="panel space-y-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="space-y-2">
-              <span className="eyebrow">Admin</span>
+              <span className="eyebrow">Admin · Overview</span>
               <h1 className="text-3xl font-semibold tracking-tight text-slate-950">
-                Participant Dashboard :)
+                All Participants
               </h1>
-              <p className="body-copy">
-                Monitor participant progress, failures, completions, and
-                response details across the study.
+              <p className="body-copy max-w-xl">
+                Monitor all{" "}
+                <span className="font-semibold text-slate-950">{total}</span>{" "}
+                participants across every stage — including those in progress,
+                failed, and completed.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Link href="/admin/feedback" className="secondary-button">
-                Feedback
-              </Link>
               <Link href="/admin/stats" className="secondary-button">
                 Statistics
+              </Link>
+              <Link href="/admin/feedback" className="secondary-button">
+                Feedback
               </Link>
               <button
                 type="button"
@@ -332,7 +339,7 @@ export function AdminDashboard({ initialData, onLogout }: AdminDashboardProps) {
                 onClick={() => void refreshDashboard()}
                 disabled={refreshing}
               >
-                {refreshing ? "Refreshing..." : "Refresh"}
+                {refreshing ? "Refreshing…" : "Refresh"}
               </button>
               <button
                 type="button"
@@ -344,136 +351,115 @@ export function AdminDashboard({ initialData, onLogout }: AdminDashboardProps) {
             </div>
           </div>
 
+          {/* Status overview cards */}
           <div className="grid gap-4 lg:grid-cols-3">
             {(["in_progress", "failed", "completed"] as AdminStatus[]).map(
-              (status) => {
-                const summary = dashboardData.summary[status];
-                const expanded = summaryExpanded;
-                return (
-                  <button
-                    key={status}
-                    type="button"
-                    onClick={() => setSummaryExpanded((previous) => !previous)}
-                    className={[
-                      "rounded-[1.75rem] border p-5 text-left transition",
-                      statusMeta[status].cardClass,
-                    ].join(" ")}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <div className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-600">
-                          {statusMeta[status].label}
-                        </div>
-                        <div className="mt-2 text-4xl font-semibold tracking-tight text-slate-950">
-                          {summary.total}
-                        </div>
-                      </div>
-                      <span className="text-sm font-semibold text-slate-500">
-                        {expanded ? "Hide" : "Show"}
-                      </span>
-                    </div>
-                    {expanded ? (
-                      <div className="mt-5 rounded-[1.25rem] border border-white/80 bg-white/70 p-4">
-                        {renderBreakdownTable(summary.breakdown, status)}
-                      </div>
-                    ) : null}
-                  </button>
-                );
-              },
+              (status) => (
+                <StatusCard
+                  key={status}
+                  status={status}
+                  summary={summary[status]}
+                />
+              ),
             )}
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+          {/* Duration + Feedback side-by-side */}
+          <div className="grid gap-4 xl:grid-cols-2">
             <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <div className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-600">
-                    Success Duration
+                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Completed Duration
                   </div>
-                  <div className="mt-2 text-sm text-slate-600">
-                    Based on completed participants with recorded total time.
+                  <div className="mt-1 text-sm text-slate-600">
+                    Time-on-task for completed participants.
                   </div>
                 </div>
-                <div className="text-sm font-semibold text-slate-500">
-                  n = {dashboardData.summary.completedDuration.count}
-                </div>
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-500">
+                  n = {summary.completedDuration.count}
+                </span>
               </div>
-              <div className="mt-5 grid gap-4 sm:grid-cols-3">
-                <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                    Min
+              <div className="mt-4 grid grid-cols-3 gap-3">
+                {[
+                  {
+                    label: "Min",
+                    value: formatDuration(summary.completedDuration.minSeconds),
+                  },
+                  {
+                    label: "Avg",
+                    value: formatDuration(
+                      summary.completedDuration.averageSeconds,
+                    ),
+                  },
+                  {
+                    label: "Max",
+                    value: formatDuration(summary.completedDuration.maxSeconds),
+                  },
+                ].map(({ label, value }) => (
+                  <div
+                    key={label}
+                    className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-3 text-center"
+                  >
+                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      {label}
+                    </div>
+                    <div className="mt-1 text-base font-semibold text-slate-950">
+                      {value}
+                    </div>
                   </div>
-                  <div className="mt-2 text-lg font-semibold text-slate-950">
-                    {formatDuration(
-                      dashboardData.summary.completedDuration.minSeconds,
-                    )}
-                  </div>
-                </div>
-                <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                    Max
-                  </div>
-                  <div className="mt-2 text-lg font-semibold text-slate-950">
-                    {formatDuration(
-                      dashboardData.summary.completedDuration.maxSeconds,
-                    )}
-                  </div>
-                </div>
-                <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                    Avg
-                  </div>
-                  <div className="mt-2 text-lg font-semibold text-slate-950">
-                    {formatDuration(
-                      dashboardData.summary.completedDuration.averageSeconds,
-                    )}
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
 
             <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <div className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-600">
-                    Success With Feedback Content
+                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Feedback Submitted
                   </div>
-                  <div className="mt-2 text-sm text-slate-600">
-                    Completed participants who entered non-empty feedback in
-                    the stage 6 pop-up.
+                  <div className="mt-1 text-sm text-slate-600">
+                    Completed participants who entered non-empty feedback.
                   </div>
                 </div>
                 <div className="text-3xl font-semibold tracking-tight text-slate-950">
-                  {dashboardData.summary.completedFeedbackContent.total}
+                  {summary.completedFeedbackContent.total}
                 </div>
               </div>
-              <div className="mt-5 rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
-                {renderBreakdownTable(
-                  dashboardData.summary.completedFeedbackContent.breakdown,
-                  "completed-feedback-content",
-                )}
-              </div>
+              <IvBreakdownGrid
+                breakdown={summary.completedFeedbackContent.breakdown}
+                keyPrefix="feedback"
+              />
             </div>
           </div>
         </div>
 
+        {/* Participant table */}
         <div className="panel space-y-5">
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_repeat(4,minmax(0,0.75fr))]">
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-700">
+          <div className="space-y-1">
+            <span className="eyebrow">Participant List</span>
+            <p className="text-sm text-slate-600">
+              {filteredRows.length} of {dashboardData.rows.length} participants
+              shown.
+            </p>
+          </div>
+
+          {/* Filters */}
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,0.7fr))]">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                 Search
               </label>
               <input
                 type="text"
                 value={searchText}
                 onChange={(event) => setSearchText(event.currentTarget.value)}
-                placeholder="Search participant or failure details"
+                placeholder="Participant ID or failure details…"
                 className="block w-full rounded-[1.25rem] border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-900 focus:ring-4 focus:ring-indigo-200/70"
               />
             </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-700">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                 Status
               </label>
               <select
@@ -488,12 +474,11 @@ export function AdminDashboard({ initialData, onLogout }: AdminDashboardProps) {
                 <option value="all">All</option>
                 <option value="in_progress">In Progress</option>
                 <option value="failed">Failed</option>
-                <option value="completed">Success</option>
+                <option value="completed">Completed</option>
               </select>
             </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-700">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                 IV1
               </label>
               <select
@@ -508,9 +493,8 @@ export function AdminDashboard({ initialData, onLogout }: AdminDashboardProps) {
                 <option value="B">B</option>
               </select>
             </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-700">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                 IV2
               </label>
               <select
@@ -525,12 +509,11 @@ export function AdminDashboard({ initialData, onLogout }: AdminDashboardProps) {
                 <option value="B">B</option>
               </select>
             </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-700">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                 Order
               </label>
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+              <div className="grid grid-cols-[1fr_auto] gap-2">
                 <select
                   value={orderField}
                   onChange={(event) =>
@@ -541,16 +524,14 @@ export function AdminDashboard({ initialData, onLogout }: AdminDashboardProps) {
                   <option value="updated_at">Updated</option>
                   <option value="started_at">Started</option>
                   <option value="prolific_id">Participant ID</option>
-                  <option value="submission_count">Submission count</option>
-                  <option value="total_seconds">Total seconds</option>
-                  <option value="last_submission_at">Last submission</option>
+                  <option value="submission_count">Submissions</option>
+                  <option value="total_seconds">Duration</option>
+                  <option value="last_submission_at">Last sub.</option>
                 </select>
                 <button
                   type="button"
                   onClick={() =>
-                    setOrderDirection((previous) =>
-                      previous === "desc" ? "asc" : "desc",
-                    )
+                    setOrderDirection((p) => (p === "desc" ? "asc" : "desc"))
                   }
                   className="secondary-button px-4"
                 >
@@ -560,62 +541,85 @@ export function AdminDashboard({ initialData, onLogout }: AdminDashboardProps) {
             </div>
           </div>
 
+          {/* Table */}
           <div className="overflow-x-auto rounded-[1.5rem] border border-slate-200 bg-white">
             <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 text-slate-500">
+              <thead className="bg-slate-50">
                 <tr>
-                  <th className="px-4 py-3 text-left font-semibold">
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                     Participant
                   </th>
-                  <th className="px-4 py-3 text-left font-semibold">Status</th>
-                  <th className="px-4 py-3 text-left font-semibold">IV1</th>
-                  <th className="px-4 py-3 text-left font-semibold">IV2</th>
-                  <th className="px-4 py-3 text-left font-semibold">
-                    Stage idx
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    Status
                   </th>
-                  <th className="px-4 py-3 text-left font-semibold">
-                    Failed stage
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    IV1 / IV2
                   </th>
-                  <th className="px-4 py-3 text-left font-semibold">
-                    Submission count
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    Stage
                   </th>
-                  <th className="px-4 py-3 text-left font-semibold">
-                    Total seconds
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    Failed At
                   </th>
-                  <th className="px-4 py-3 text-left font-semibold">
-                    Last update
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    Duration
                   </th>
-                  <th className="px-4 py-3 text-left font-semibold">Action</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    Last Update
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    Action
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {filteredRows.map((row) => (
                   <tr
                     key={row.prolific_id}
-                    className="border-t border-slate-200 text-slate-800"
+                    className="border-t border-slate-100 transition hover:bg-slate-50/60"
                   >
-                    <td className="px-4 py-3 font-mono text-xs text-slate-900">
+                    <td className="px-4 py-3 font-mono text-xs text-slate-800">
                       {row.prolific_id}
                     </td>
                     <td className="px-4 py-3">
                       <span
                         className={[
-                          "chip normal-case tracking-normal",
+                          "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold",
                           statusMeta[row.status].chipClass,
                         ].join(" ")}
                       >
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${statusMeta[row.status].dotClass}`}
+                        />
                         {statusMeta[row.status].label}
                       </span>
                     </td>
-                    <td className="px-4 py-3">{row.iv1}</td>
-                    <td className="px-4 py-3">{row.iv2}</td>
-                    <td className="px-4 py-3">{row.current_stage_index}</td>
-                    <td className="px-4 py-3">{row.failed_stage_id ?? "—"}</td>
-                    <td className="px-4 py-3">{row.submission_count}</td>
                     <td className="px-4 py-3">
-                      {formatDuration(row.total_seconds)}
+                      <div className="flex gap-1.5">
+                        <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-slate-700">
+                          {row.iv1}
+                        </span>
+                        <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-slate-700">
+                          {row.iv2}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700">
+                      {row.current_stage_index}
                     </td>
                     <td className="px-4 py-3">
+                      {row.failed_stage_id ? (
+                        <span className="rounded-md bg-red-50 px-2 py-0.5 font-mono text-xs text-red-700">
+                          {row.failed_stage_id}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700">
+                      {formatDuration(row.total_seconds)}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-600">
                       {formatDateTime(row.updated_at)}
                     </td>
                     <td className="px-4 py-3">
@@ -626,7 +630,7 @@ export function AdminDashboard({ initialData, onLogout }: AdminDashboardProps) {
                           void openParticipantDetail(row.prolific_id)
                         }
                       >
-                        View detail
+                        Detail
                       </button>
                     </td>
                   </tr>
@@ -634,8 +638,8 @@ export function AdminDashboard({ initialData, onLogout }: AdminDashboardProps) {
                 {filteredRows.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={10}
-                      className="px-4 py-10 text-center text-slate-500"
+                      colSpan={8}
+                      className="px-4 py-10 text-center text-sm text-slate-500"
                     >
                       No participants match the current filters.
                     </td>
@@ -647,19 +651,20 @@ export function AdminDashboard({ initialData, onLogout }: AdminDashboardProps) {
         </div>
       </div>
 
+      {/* Participant detail modal */}
       {selectedProlificId ? (
         <div className="modal-backdrop">
-          <div className="w-full max-w-6xl space-y-6 overflow-y-auto rounded-[2rem] border border-slate-200 bg-white p-7 sm:p-8 shadow-[0_36px_120px_-50px_rgba(15,23,42,0.5)] max-h-[90svh]">
+          <div className="w-full max-w-5xl space-y-6 overflow-y-auto rounded-[2rem] border border-slate-200 bg-white p-7 shadow-[0_36px_120px_-50px_rgba(15,23,42,0.5)] max-h-[90svh] sm:p-8">
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-2">
-                <span className="eyebrow">Participant detail</span>
-                <h2 className="text-3xl font-semibold tracking-tight text-slate-950">
+                <span className="eyebrow">Participant Detail</span>
+                <h2 className="break-all font-mono text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">
                   {selectedProlificId}
                 </h2>
               </div>
               <button
                 type="button"
-                className="secondary-button px-4 py-2 text-xs"
+                className="secondary-button shrink-0 px-4 py-2 text-xs"
                 onClick={() => {
                   setSelectedProlificId(null);
                   setDetailError(null);
@@ -671,139 +676,149 @@ export function AdminDashboard({ initialData, onLogout }: AdminDashboardProps) {
 
             {loadingDetail && !selectedParticipant ? (
               <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-5 py-10 text-center text-slate-600">
-                Loading participant detail...
+                Loading participant detail…
               </div>
             ) : detailError ? (
               <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {detailError}
               </div>
             ) : selectedParticipant ? (
-              <div className="space-y-6">
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
-                    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                      Status
+              <div className="space-y-5">
+                {/* Key metrics */}
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  {[
+                    {
+                      label: "Status",
+                      value: statusMeta[selectedParticipant.status].label,
+                    },
+                    {
+                      label: "IV Condition",
+                      value: `${selectedParticipant.iv1} × ${selectedParticipant.iv2}`,
+                    },
+                    {
+                      label: "Submissions",
+                      value: String(selectedParticipant.submission_count),
+                    },
+                    {
+                      label: "Duration",
+                      value: formatDuration(selectedParticipant.total_seconds),
+                    },
+                  ].map(({ label, value }) => (
+                    <div
+                      key={label}
+                      className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4"
+                    >
+                      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                        {label}
+                      </div>
+                      <div className="mt-2 text-base font-semibold text-slate-950">
+                        {value}
+                      </div>
                     </div>
-                    <div className="mt-2 text-lg font-semibold text-slate-950">
-                      {statusMeta[selectedParticipant.status].label}
-                    </div>
-                  </div>
-                  <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
-                    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                      IV condition
-                    </div>
-                    <div className="mt-2 text-lg font-semibold text-slate-950">
-                      {selectedParticipant.iv1} × {selectedParticipant.iv2}
-                    </div>
-                  </div>
-                  <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
-                    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                      Submissions
-                    </div>
-                    <div className="mt-2 text-lg font-semibold text-slate-950">
-                      {selectedParticipant.submission_count}
-                    </div>
-                  </div>
-                  <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
-                    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                      Total duration
-                    </div>
-                    <div className="mt-2 text-lg font-semibold text-slate-950">
-                      {formatDuration(selectedParticipant.total_seconds)}
-                    </div>
-                  </div>
+                  ))}
                 </div>
 
-                <div className="grid gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+                <div className="grid gap-5 xl:grid-cols-2">
+                  {/* Failure detail */}
                   <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5">
-                    <h3 className="text-lg font-semibold text-slate-950">
-                      Failure detail
+                    <h3 className="text-base font-semibold text-slate-950">
+                      Failure Detail
                     </h3>
-                    <div className="mt-4 grid gap-4 md:grid-cols-2">
-                      <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
-                        <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                          Failed stage
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      {[
+                        {
+                          label: "Failed Stage",
+                          value: selectedParticipant.failed_stage_id ?? "—",
+                        },
+                        {
+                          label: "Last Submission Stage",
+                          value:
+                            selectedParticipant.last_submission_stage_id ??
+                            "—",
+                        },
+                      ].map(({ label, value }) => (
+                        <div
+                          key={label}
+                          className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-3"
+                        >
+                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                            {label}
+                          </div>
+                          <div className="mt-1.5 font-mono text-xs text-slate-900">
+                            {value}
+                          </div>
                         </div>
-                        <div className="mt-2 text-sm font-semibold text-slate-900">
-                          {selectedParticipant.failed_stage_id ?? "—"}
-                        </div>
-                      </div>
-                      <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
-                        <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                          Last submission stage
-                        </div>
-                        <div className="mt-2 text-sm font-semibold text-slate-900">
-                          {selectedParticipant.last_submission_stage_id ?? "—"}
-                        </div>
-                      </div>
+                      ))}
                     </div>
-                    <div className="mt-4 space-y-4">
-                      <div>
-                        <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                          Last verdict
+                    <div className="mt-3 space-y-3">
+                      {[
+                        {
+                          label: "Last Verdict",
+                          value: selectedParticipant.last_submission_verdict,
+                        },
+                        {
+                          label: "Failed Reason",
+                          value: selectedParticipant.failed_reason,
+                        },
+                      ].map(({ label, value }) => (
+                        <div key={label}>
+                          <div className="mb-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                            {label}
+                          </div>
+                          <pre className="overflow-x-auto rounded-[1rem] border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-800">
+                            {formatJson(value)}
+                          </pre>
                         </div>
-                        <pre className="overflow-x-auto rounded-[1rem] border border-slate-200 bg-slate-50 p-4 text-xs leading-5 text-slate-800">
-                          {formatJson(
-                            selectedParticipant.last_submission_verdict,
-                          )}
-                        </pre>
-                      </div>
-                      <div>
-                        <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                          Failed reason
-                        </div>
-                        <pre className="overflow-x-auto rounded-[1rem] border border-slate-200 bg-slate-50 p-4 text-xs leading-5 text-slate-800">
-                          {formatJson(selectedParticipant.failed_reason)}
-                        </pre>
-                      </div>
+                      ))}
                     </div>
                   </div>
 
+                  {/* Progress detail */}
                   <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5">
-                    <h3 className="text-lg font-semibold text-slate-950">
-                      Progress detail
+                    <h3 className="text-base font-semibold text-slate-950">
+                      Progress Detail
                     </h3>
-                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                      <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
-                        <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                          Current stage index
-                        </div>
-                        <div className="mt-2 text-base font-semibold text-slate-950">
-                          {selectedParticipant.current_stage_index}
-                        </div>
-                      </div>
-                      <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
-                        <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                          Last submission time
-                        </div>
-                        <div className="mt-2 text-sm font-semibold text-slate-950">
-                          {formatDateTime(
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      {[
+                        {
+                          label: "Current Stage",
+                          value: String(
+                            selectedParticipant.current_stage_index,
+                          ),
+                        },
+                        {
+                          label: "Last Submission",
+                          value: formatDateTime(
                             selectedParticipant.last_submission_at,
-                          )}
+                          ),
+                        },
+                        {
+                          label: "Started At",
+                          value: formatDateTime(selectedParticipant.started_at),
+                        },
+                        {
+                          label: "Updated At",
+                          value: formatDateTime(selectedParticipant.updated_at),
+                        },
+                      ].map(({ label, value }) => (
+                        <div
+                          key={label}
+                          className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-3"
+                        >
+                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                            {label}
+                          </div>
+                          <div className="mt-1.5 text-sm font-semibold text-slate-950">
+                            {value}
+                          </div>
                         </div>
-                      </div>
-                      <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
-                        <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                          Started at
-                        </div>
-                        <div className="mt-2 text-sm font-semibold text-slate-950">
-                          {formatDateTime(selectedParticipant.started_at)}
-                        </div>
-                      </div>
-                      <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
-                        <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                          Updated at
-                        </div>
-                        <div className="mt-2 text-sm font-semibold text-slate-950">
-                          {formatDateTime(selectedParticipant.updated_at)}
-                        </div>
-                      </div>
+                      ))}
                     </div>
-                    <div className="mt-4">
-                      <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                        Stage variants
+                    <div className="mt-3">
+                      <div className="mb-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                        Stage Variants
                       </div>
-                      <pre className="overflow-x-auto rounded-[1rem] border border-slate-200 bg-slate-50 p-4 text-xs leading-5 text-slate-800">
+                      <pre className="overflow-x-auto rounded-[1rem] border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-800">
                         {formatJson(
                           getDisplayedStageVariants(selectedParticipant),
                         )}
@@ -812,36 +827,30 @@ export function AdminDashboard({ initialData, onLogout }: AdminDashboardProps) {
                   </div>
                 </div>
 
+                {/* Response payloads */}
                 <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <h3 className="text-lg font-semibold text-slate-950">
-                      Response payloads
+                    <h3 className="text-base font-semibold text-slate-950">
+                      Response Payloads
                     </h3>
                     <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setDetailTab("answers")}
-                        className={[
-                          "secondary-button px-4 py-2 text-xs",
-                          detailTab === "answers"
-                            ? "border-slate-950 bg-slate-950 text-white hover:bg-slate-900"
-                            : "",
-                        ].join(" ")}
-                      >
-                        Questionnaire answers
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDetailTab("submissions")}
-                        className={[
-                          "secondary-button px-4 py-2 text-xs",
-                          detailTab === "submissions"
-                            ? "border-slate-950 bg-slate-950 text-white hover:bg-slate-900"
-                            : "",
-                        ].join(" ")}
-                      >
-                        Submissions detail
-                      </button>
+                      {(["answers", "submissions"] as const).map((tab) => (
+                        <button
+                          key={tab}
+                          type="button"
+                          onClick={() => setDetailTab(tab)}
+                          className={[
+                            "secondary-button px-4 py-2 text-xs",
+                            detailTab === tab
+                              ? "border-slate-950 bg-slate-950 text-white hover:bg-slate-900"
+                              : "",
+                          ].join(" ")}
+                        >
+                          {tab === "answers"
+                            ? "Questionnaire Answers"
+                            : "Submissions Detail"}
+                        </button>
+                      ))}
                     </div>
                   </div>
                   <pre className="mt-4 overflow-x-auto rounded-[1rem] border border-slate-200 bg-slate-50 p-4 text-xs leading-5 text-slate-800">

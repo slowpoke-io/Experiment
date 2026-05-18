@@ -14,14 +14,12 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { DataGrid, type CellMouseArgs, type Column } from "react-data-grid";
+import { DataGrid, type CellMouseArgs, type Column, type SortColumn } from "react-data-grid";
 
 import type {
   AdminConstructDefinition,
-  AdminDashboardSummary,
   AdminStatisticsResponse,
   AdminStatsParticipantRow,
-  AdminStatus,
   ApiErrorResponse,
 } from "@/lib/types";
 
@@ -49,11 +47,7 @@ type DetailState =
       kind: "construct";
       participantId: string;
       construct: AdminConstructDefinition;
-      values: Array<{
-        key: string;
-        sourceKey: string;
-        value: unknown;
-      }>;
+      values: Array<{ key: string; sourceKey: string; value: unknown }>;
     }
   | {
       kind: "text";
@@ -79,57 +73,17 @@ type ComparisonGroup = {
   layout: "pair" | "single";
 };
 
-const statusMeta: Record<
-  AdminStatus,
-  { label: string; cardClass: string; chipClass: string }
-> = {
-  in_progress: {
-    label: "In Progress",
-    cardClass: "border-amber-200 bg-amber-50/80",
-    chipClass: "border-amber-300 bg-amber-100 text-amber-800",
-  },
-  failed: {
-    label: "Failed",
-    cardClass: "border-red-200 bg-red-50/80",
-    chipClass: "border-red-300 bg-red-100 text-red-800",
-  },
-  completed: {
-    label: "Success",
-    cardClass: "border-emerald-200 bg-emerald-50/80",
-    chipClass: "border-emerald-300 bg-emerald-100 text-emerald-800",
-  },
-};
-
-const conditionMeta = {
-  A: {
-    label: "Condition A",
-    fill: "#f59e0b",
-  },
-  B: {
-    label: "Condition B",
-    fill: "#0f766e",
-  },
+const IV_COLORS = {
+  A: { fill: "#f59e0b", label: "Condition A" },
+  B: { fill: "#0f766e", label: "Condition B" },
 } as const;
 
-function formatDuration(seconds: number | null) {
-  if (seconds === null) {
-    return "—";
-  }
-
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const remainingSeconds = seconds % 60;
-
-  if (hours > 0) {
-    return `${hours}h ${minutes}m ${remainingSeconds}s`;
-  }
-
-  if (minutes > 0) {
-    return `${minutes}m ${remainingSeconds}s`;
-  }
-
-  return `${remainingSeconds}s`;
-}
+// IV1 A sees a subtle notice → should NOT recall it → correct = "no"
+// IV1 B sees a prominent notice → should recall it → correct = "yes"
+const MANIPULATION1_CORRECT: Record<string, string> = {
+  A: "no",
+  B: "yes",
+};
 
 function formatScore(value: number | null | undefined) {
   return typeof value === "number" ? value.toFixed(2) : "—";
@@ -140,18 +94,10 @@ function formatCount(value: unknown) {
 }
 
 function formatCellValue(value: unknown) {
-  if (value === null || value === undefined) {
-    return "—";
-  }
-
-  if (typeof value === "number") {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "number")
     return Number.isInteger(value) ? String(value) : value.toFixed(2);
-  }
-
-  if (typeof value === "string") {
-    return value.trim().length > 0 ? value : "—";
-  }
-
+  if (typeof value === "string") return value.trim().length > 0 ? value : "—";
   return JSON.stringify(value);
 }
 
@@ -160,229 +106,49 @@ function hasNonEmptyString(value: unknown): value is string {
 }
 
 function normalizeManipulationChoiceLabel(value: unknown) {
-  if (value === "yes") {
-    return "Yes";
-  }
-
-  if (value === "no") {
-    return "No";
-  }
-
-  if (value === "dont_recall") {
-    return "Don't recall";
-  }
-
-  if (typeof value === "number" || typeof value === "string") {
-    return String(value);
-  }
-
+  if (value === "yes") return "Yes";
+  if (value === "no") return "No";
+  if (value === "dont_recall") return "Don't recall";
+  if (typeof value === "number" || typeof value === "string") return String(value);
   return "—";
 }
 
 function average(values: number[]) {
-  if (values.length === 0) {
-    return null;
-  }
-
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-function renderBreakdownTable(
-  breakdown: { iv1: string; iv2: string; count: number }[],
-  keyPrefix: string,
-) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-56 text-sm">
-        <thead>
-          <tr className="text-slate-500">
-            <th className="px-3 py-2 text-left">IV1 \ IV2</th>
-            <th className="px-3 py-2 text-center">A</th>
-            <th className="px-3 py-2 text-center">B</th>
-          </tr>
-        </thead>
-        <tbody>
-          {["A", "B"].map((iv1) => (
-            <tr
-              key={`${keyPrefix}-${iv1}`}
-              className="border-t border-slate-200/80"
-            >
-              <td className="px-3 py-2 font-semibold text-slate-700">{iv1}</td>
-              {["A", "B"].map((iv2) => {
-                const cell = breakdown.find(
-                  (entry) => entry.iv1 === iv1 && entry.iv2 === iv2,
-                );
-                return (
-                  <td
-                    key={`${keyPrefix}-${iv1}-${iv2}`}
-                    className="px-3 py-2 text-center font-medium text-slate-900"
-                  >
-                    {cell?.count ?? 0}
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function AdminSummaryPanels({
-  summary,
-  expanded,
-  onToggle,
-}: {
-  summary: AdminDashboardSummary;
-  expanded: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <>
-      <div className="grid gap-4 lg:grid-cols-3">
-        {(["in_progress", "failed", "completed"] as AdminStatus[]).map(
-          (status) => {
-            const statusSummary = summary[status];
-
-            return (
-              <button
-                key={status}
-                type="button"
-                onClick={onToggle}
-                className={[
-                  "rounded-[1.75rem] border p-5 text-left transition",
-                  statusMeta[status].cardClass,
-                ].join(" ")}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-600">
-                      {statusMeta[status].label}
-                    </div>
-                    <div className="mt-2 text-4xl font-semibold tracking-tight text-slate-950">
-                      {statusSummary.total}
-                    </div>
-                  </div>
-                  <span className="text-sm font-semibold text-slate-500">
-                    {expanded ? "Hide" : "Show"}
-                  </span>
-                </div>
-                {expanded ? (
-                  <div className="mt-5 rounded-[1.25rem] border border-white/80 bg-white/70 p-4">
-                    {renderBreakdownTable(statusSummary.breakdown, status)}
-                  </div>
-                ) : null}
-              </button>
-            );
-          },
-        )}
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-        <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-600">
-                Success Duration
-              </div>
-              <div className="mt-2 text-sm text-slate-600">
-                Based on completed participants with recorded total time.
-              </div>
-            </div>
-            <div className="text-sm font-semibold text-slate-500">
-              n = {summary.completedDuration.count}
-            </div>
-          </div>
-          <div className="mt-5 grid gap-4 sm:grid-cols-3">
-            <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                Min
-              </div>
-              <div className="mt-2 text-lg font-semibold text-slate-950">
-                {formatDuration(summary.completedDuration.minSeconds)}
-              </div>
-            </div>
-            <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                Max
-              </div>
-              <div className="mt-2 text-lg font-semibold text-slate-950">
-                {formatDuration(summary.completedDuration.maxSeconds)}
-              </div>
-            </div>
-            <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                Avg
-              </div>
-              <div className="mt-2 text-lg font-semibold text-slate-950">
-                {formatDuration(summary.completedDuration.averageSeconds)}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-600">
-                Success With Feedback Content
-              </div>
-              <div className="mt-2 text-sm text-slate-600">
-                Completed participants who entered non-empty `FEEDBACK_CONTENT`.
-              </div>
-            </div>
-            <div className="text-3xl font-semibold tracking-tight text-slate-950">
-              {summary.completedFeedbackContent.total}
-            </div>
-          </div>
-          <div className="mt-5 rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
-            {renderBreakdownTable(
-              summary.completedFeedbackContent.breakdown,
-              "completed-feedback-content",
-            )}
-          </div>
-        </div>
-      </div>
-    </>
-  );
+  if (values.length === 0) return null;
+  return values.reduce((sum, v) => sum + v, 0) / values.length;
 }
 
 function buildConstructComparisonData(
   constructs: AdminConstructDefinition[],
   rows: AdminStatsParticipantRow[],
   ivMode: IvMode,
-) {
+): ComparisonDatum[] {
   return constructs
     .map((construct) => {
       const allValues = rows
         .map((row) => row.construct_averages[construct.id])
-        .filter((value): value is number => typeof value === "number");
-      const conditionAValues = rows
+        .filter((v): v is number => typeof v === "number");
+      const aValues = rows
         .filter((row) => row[ivMode] === "A")
         .map((row) => row.construct_averages[construct.id])
-        .filter((value): value is number => typeof value === "number");
-      const conditionBValues = rows
+        .filter((v): v is number => typeof v === "number");
+      const bValues = rows
         .filter((row) => row[ivMode] === "B")
         .map((row) => row.construct_averages[construct.id])
-        .filter((value): value is number => typeof value === "number");
-
+        .filter((v): v is number => typeof v === "number");
       return {
         ...construct,
         overallMean: average(allValues),
-        conditionAMean: average(conditionAValues),
-        conditionBMean: average(conditionBValues),
-        conditionACount: conditionAValues.length,
-        conditionBCount: conditionBValues.length,
+        conditionAMean: average(aValues),
+        conditionBMean: average(bValues),
+        conditionACount: aValues.length,
+        conditionBCount: bValues.length,
       };
     })
-    .filter(
-      (construct): construct is ComparisonDatum =>
-        construct.overallMean !== null,
-    );
+    .filter((c): c is ComparisonDatum => c.overallMean !== null);
 }
 
-function buildComparisonGroups(constructData: ComparisonDatum[]) {
+function buildComparisonGroups(constructData: ComparisonDatum[]): ComparisonGroup[] {
   const explicitPairs = [
     {
       familyKey: "SCS",
@@ -397,65 +163,35 @@ function buildComparisonGroups(constructData: ComparisonDatum[]) {
       rightId: "GUILT",
     },
   ] as const;
-  const remaining = new Map(
-    constructData.map((construct) => [construct.id, construct]),
-  );
-  const pairs = new Map<
-    string,
-    {
-      pre?: ComparisonDatum;
-      post?: ComparisonDatum;
-    }
-  >();
+
+  const remaining = new Map(constructData.map((c) => [c.id, c]));
+  const pairs = new Map<string, { pre?: ComparisonDatum; post?: ComparisonDatum }>();
   const remainder: ComparisonDatum[] = [];
 
-  const explicitPairGroups: ComparisonGroup[] = explicitPairs.flatMap(
-    (pair) => {
-      const left = remaining.get(pair.leftId) ?? null;
-      const right = remaining.get(pair.rightId) ?? null;
-
-      if (!left && !right) {
-        return [];
-      }
-
-      if (left) {
-        remaining.delete(pair.leftId);
-      }
-
-      if (right) {
-        remaining.delete(pair.rightId);
-      }
-
-      return [
-        {
-          familyKey: pair.familyKey,
-          familyLabel: pair.familyLabel,
-          left,
-          right,
-          layout: "pair" as const,
-        },
-      ];
-    },
-  );
+  const explicitPairGroups: ComparisonGroup[] = explicitPairs.flatMap((pair) => {
+    const left = remaining.get(pair.leftId) ?? null;
+    const right = remaining.get(pair.rightId) ?? null;
+    if (!left && !right) return [];
+    if (left) remaining.delete(pair.leftId);
+    if (right) remaining.delete(pair.rightId);
+    return [{ familyKey: pair.familyKey, familyLabel: pair.familyLabel, left, right, layout: "pair" as const }];
+  });
 
   for (const construct of remaining.values()) {
     const preMatch = construct.id.match(/^PRE_(.+)$/);
     const postMatch = construct.id.match(/^POST_(.+)$/);
-
     if (preMatch) {
       const entry = pairs.get(preMatch[1]) ?? {};
       entry.pre = construct;
       pairs.set(preMatch[1], entry);
       continue;
     }
-
     if (postMatch) {
       const entry = pairs.get(postMatch[1]) ?? {};
       entry.post = construct;
       pairs.set(postMatch[1], entry);
       continue;
     }
-
     remainder.push(construct);
   }
 
@@ -472,10 +208,10 @@ function buildComparisonGroups(constructData: ComparisonDatum[]) {
     }),
   );
 
-  const remainderGroups: ComparisonGroup[] = remainder.map((construct) => ({
-    familyKey: construct.id,
-    familyLabel: construct.label,
-    left: construct,
+  const remainderGroups: ComparisonGroup[] = remainder.map((c) => ({
+    familyKey: c.id,
+    familyLabel: c.label,
+    left: c,
     right: null,
     layout: "single" as const,
   }));
@@ -484,30 +220,844 @@ function buildComparisonGroups(constructData: ComparisonDatum[]) {
 }
 
 function buildManipulation1ChartData(rows: AdminStatsParticipantRow[]) {
-  const optionOrder = ["yes", "no", "dont_recall"];
-
-  return optionOrder.map((optionKey) => ({
+  return ["yes", "no", "dont_recall"].map((optionKey) => ({
     option: normalizeManipulationChoiceLabel(optionKey),
     A: rows.filter(
-      (row) =>
-        row.iv1 === "A" &&
-        row.response_values["stage_7.MANIPULATION_IV1"] === optionKey,
+      (row) => row.iv1 === "A" && row.response_values["stage_7.MANIPULATION_IV1"] === optionKey,
     ).length,
     B: rows.filter(
-      (row) =>
-        row.iv1 === "B" &&
-        row.response_values["stage_7.MANIPULATION_IV1"] === optionKey,
+      (row) => row.iv1 === "B" && row.response_values["stage_7.MANIPULATION_IV1"] === optionKey,
     ).length,
   }));
 }
 
-function defaultTooltipFormatter(value: unknown) {
-  if (typeof value === "number") {
-    return value.toFixed(2);
-  }
-
-  return String(value);
+function buildSheetRows(rows: AdminStatsParticipantRow[]): SheetRow[] {
+  return rows.map((row) => ({
+    id: row.prolific_id,
+    prolific_id: row.prolific_id,
+    iv1: row.iv1,
+    iv2: row.iv2,
+    manipulation1: normalizeManipulationChoiceLabel(row.response_values["stage_7.MANIPULATION_IV1"]),
+    manipulation2:
+      typeof row.construct_averages.MANIPULATION_IV2 === "number"
+        ? row.construct_averages.MANIPULATION_IV2
+        : null,
+    feedback_content_flag: hasNonEmptyString(row.response_values["stage_6.FEEDBACK_CONTENT"])
+      ? "Has"
+      : "No",
+    feedback_reason_flag: hasNonEmptyString(row.response_values["stage_7.FEEDBACK_REASON"])
+      ? "Has"
+      : "No",
+    __source: row,
+  }));
 }
+
+/* ── Chart components ── */
+
+function ConditionBadge({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+      <div className="flex items-center gap-1.5">
+        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
+        <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+          {label}
+        </span>
+      </div>
+      <div className="mt-1 text-lg font-semibold text-slate-950">{value}</div>
+    </div>
+  );
+}
+
+function TwoConditionAverageChart({
+  title,
+  subtitle,
+  maxValue,
+  overallMean,
+  conditionAMean,
+  conditionBMean,
+  ivLabel = "IV",
+}: {
+  title: string;
+  subtitle?: string;
+  maxValue: number;
+  overallMean: number | null;
+  conditionAMean: number | null;
+  conditionBMean: number | null;
+  ivLabel?: string;
+}) {
+  const delta =
+    conditionAMean !== null && conditionBMean !== null
+      ? conditionAMean - conditionBMean
+      : null;
+
+  const chartData = [
+    { condition: `${ivLabel} A`, value: conditionAMean ?? 0, fill: IV_COLORS.A.fill },
+    { condition: `${ivLabel} B`, value: conditionBMean ?? 0, fill: IV_COLORS.B.fill },
+  ];
+
+  return (
+    <div className="min-w-0 rounded-[1.35rem] border border-slate-200 bg-white/80 p-4 shadow-sm">
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-0.5">
+          <div className="text-sm font-semibold text-slate-950">{title}</div>
+          {subtitle ? (
+            <div className="text-xs text-slate-500">{subtitle}</div>
+          ) : null}
+        </div>
+        <div className="shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-right">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Overall Avg
+          </div>
+          <div className="mt-0.5 text-lg font-semibold text-slate-950">
+            {formatScore(overallMean)}
+          </div>
+          <div className="text-[11px] text-slate-400">/ {maxValue}</div>
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        <ConditionBadge
+          label={`${ivLabel} A`}
+          value={formatScore(conditionAMean)}
+          color={IV_COLORS.A.fill}
+        />
+        <ConditionBadge
+          label={`${ivLabel} B`}
+          value={formatScore(conditionBMean)}
+          color={IV_COLORS.B.fill}
+        />
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Delta (A−B)
+          </div>
+          <div
+            className={[
+              "mt-1 text-lg font-semibold",
+              delta === null
+                ? "text-slate-400"
+                : delta > 0
+                  ? "text-amber-700"
+                  : delta < 0
+                    ? "text-teal-700"
+                    : "text-slate-700",
+            ].join(" ")}
+          >
+            {delta !== null
+              ? `${delta >= 0 ? "+" : ""}${delta.toFixed(2)}`
+              : "—"}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 h-48 rounded-[1rem] border border-slate-200 bg-slate-50/60 p-2">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={chartData}
+            layout="vertical"
+            margin={{ top: 6, right: 32, left: 8, bottom: 0 }}
+          >
+            <CartesianGrid stroke="#e2e8f0" horizontal={false} />
+            <XAxis
+              type="number"
+              domain={[0, maxValue]}
+              tick={{ fill: "#64748b", fontSize: 11 }}
+            />
+            <YAxis
+              type="category"
+              dataKey="condition"
+              width={56}
+              tick={{ fill: "#334155", fontSize: 11 }}
+            />
+            <Tooltip
+              formatter={(value: unknown) =>
+                typeof value === "number" ? value.toFixed(2) : String(value)
+              }
+            />
+            {overallMean !== null ? (
+              <ReferenceLine
+                x={overallMean}
+                stroke="#94a3b8"
+                strokeDasharray="4 3"
+                label={{
+                  value: `Avg ${overallMean.toFixed(2)}`,
+                  position: "insideTopRight",
+                  fill: "#64748b",
+                  fontSize: 10,
+                }}
+              />
+            ) : null}
+            <Bar dataKey="value" radius={[0, 999, 999, 0]} maxBarSize={26}>
+              {chartData.map((entry) => (
+                <Cell key={entry.condition} fill={entry.fill} />
+              ))}
+              <LabelList
+                dataKey="value"
+                position="right"
+                formatter={(v: unknown) =>
+                  typeof v === "number" ? v.toFixed(2) : String(v)
+                }
+                style={{ fontSize: 11, fill: "#475569" }}
+              />
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+function Manipulation1Chart({ rows }: { rows: AdminStatsParticipantRow[] }) {
+  const chartData = buildManipulation1ChartData(rows);
+  const maxValue = Math.max(1, ...chartData.flatMap((item) => [item.A, item.B]));
+
+  const totalA = rows.filter((r) => r.iv1 === "A").length;
+  const totalB = rows.filter((r) => r.iv1 === "B").length;
+
+  // IV1 A correct = "no", IV1 B correct = "yes"
+  const correctA = rows.filter(
+    (r) => r.iv1 === "A" && r.response_values["stage_7.MANIPULATION_IV1"] === MANIPULATION1_CORRECT.A,
+  ).length;
+  const correctB = rows.filter(
+    (r) => r.iv1 === "B" && r.response_values["stage_7.MANIPULATION_IV1"] === MANIPULATION1_CORRECT.B,
+  ).length;
+
+  return (
+    <div className="min-w-0 space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-[1.25rem] border border-amber-200 bg-amber-50 p-4 text-center">
+          <div className="flex items-center justify-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-amber-400" />
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-amber-700">
+              IV1 A — correct: No
+            </span>
+          </div>
+          <div className="mt-1.5 text-3xl font-semibold text-amber-950">
+            {correctA}
+            <span className="ml-1 text-base text-amber-600">/ {totalA}</span>
+          </div>
+          <div className="mt-0.5 text-xs text-amber-700">
+            {totalA > 0 ? Math.round((correctA / totalA) * 100) : 0}% correct
+          </div>
+        </div>
+        <div className="rounded-[1.25rem] border border-teal-200 bg-teal-50 p-4 text-center">
+          <div className="flex items-center justify-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-teal-500" />
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700">
+              IV1 B — correct: Yes
+            </span>
+          </div>
+          <div className="mt-1.5 text-3xl font-semibold text-teal-950">
+            {correctB}
+            <span className="ml-1 text-base text-teal-600">/ {totalB}</span>
+          </div>
+          <div className="mt-0.5 text-xs text-teal-700">
+            {totalB > 0 ? Math.round((correctB / totalB) * 100) : 0}% correct
+          </div>
+        </div>
+      </div>
+
+      <div className="h-52 rounded-[1rem] border border-slate-200 bg-slate-50/60 p-2">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={chartData}
+            layout="vertical"
+            margin={{ top: 4, right: 28, left: 8, bottom: 0 }}
+            barCategoryGap={12}
+          >
+            <CartesianGrid stroke="#e2e8f0" horizontal={false} />
+            <XAxis type="number" domain={[0, maxValue]} tick={{ fill: "#64748b", fontSize: 11 }} />
+            <YAxis
+              type="category"
+              dataKey="option"
+              width={80}
+              tick={{ fill: "#334155", fontSize: 11 }}
+            />
+            <Tooltip />
+            <Bar
+              dataKey="A"
+              name="IV1 A"
+              fill={IV_COLORS.A.fill}
+              radius={[0, 999, 999, 0]}
+              maxBarSize={16}
+            >
+              <LabelList dataKey="A" position="right" formatter={formatCount} style={{ fontSize: 11 }} />
+            </Bar>
+            <Bar
+              dataKey="B"
+              name="IV1 B"
+              fill={IV_COLORS.B.fill}
+              radius={[0, 999, 999, 0]}
+              maxBarSize={16}
+            >
+              <LabelList dataKey="B" position="right" formatter={formatCount} style={{ fontSize: 11 }} />
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+const MANIPULATION2_THRESHOLD = 3.5;
+
+function IncorrectRespondersManip2Panel({
+  rows,
+  constructs,
+}: {
+  rows: AdminStatsParticipantRow[];
+  constructs: AdminConstructDefinition[];
+}) {
+  const [expanded, setExpanded] = useState(true);
+
+  // IV2 A: expected low → flag if score < 3.5
+  // IV2 B: expected high → flag if score > 3.5
+  const incorrectRows = rows.filter((row) => {
+    const m2 = row.construct_averages.MANIPULATION_IV2;
+    if (typeof m2 !== "number") return false;
+    if (row.iv2 === "A") return m2 < MANIPULATION2_THRESHOLD;
+    if (row.iv2 === "B") return m2 > MANIPULATION2_THRESHOLD;
+    return false;
+  });
+
+  const incorrectA = incorrectRows.filter((r) => r.iv2 === "A");
+  const incorrectB = incorrectRows.filter((r) => r.iv2 === "B");
+
+  return (
+    <div className="rounded-[1.65rem] border border-teal-100 bg-teal-50/30 p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-teal-300 bg-teal-100 px-2.5 py-0.5 text-xs font-semibold text-teal-800">
+              Manipulation 2 — Incorrect Responders
+            </span>
+            <span className="text-sm font-semibold text-slate-700">
+              n = {incorrectRows.length}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-3 text-xs text-slate-600">
+            <span>
+              <span className="font-semibold" style={{ color: IV_COLORS.A.fill }}>IV2 A</span>
+              {" "}below {MANIPULATION2_THRESHOLD}:{" "}
+              <span className="font-semibold text-red-700">{incorrectA.length}</span>
+            </span>
+            <span>·</span>
+            <span>
+              <span className="font-semibold" style={{ color: IV_COLORS.B.fill }}>IV2 B</span>
+              {" "}above {MANIPULATION2_THRESHOLD}:{" "}
+              <span className="font-semibold text-red-700">{incorrectB.length}</span>
+            </span>
+          </div>
+        </div>
+        <button
+          type="button"
+          className="secondary-button shrink-0 px-4 py-2 text-xs"
+          onClick={() => setExpanded((p) => !p)}
+        >
+          {expanded ? "Collapse" : "Expand"}
+        </button>
+      </div>
+
+      {expanded ? (
+        incorrectRows.length === 0 ? (
+          <div className="mt-4 rounded-[1.25rem] border border-emerald-200 bg-emerald-50 px-4 py-6 text-center text-sm font-semibold text-emerald-700">
+            All participants within expected range.
+          </div>
+        ) : (
+          <div className="mt-4 overflow-x-auto rounded-[1.25rem] border border-teal-100 bg-white">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50">
+                  <th className="sticky left-0 bg-slate-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.11em] text-slate-500">
+                    Participant
+                  </th>
+                  <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-[0.11em] text-slate-500">
+                    IV1
+                  </th>
+                  <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-[0.11em] text-slate-500">
+                    IV2
+                  </th>
+                  <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-[0.11em] text-teal-600">
+                    Manip 2 Avg
+                  </th>
+                  <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-[0.11em] text-slate-500">
+                    Expected
+                  </th>
+                  {constructs.map((c) => (
+                    <th
+                      key={c.id}
+                      className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-[0.11em] text-slate-500"
+                      title={c.id}
+                    >
+                      {c.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {incorrectRows.map((row) => {
+                  const m2 = row.construct_averages.MANIPULATION_IV2 as number;
+                  const expectedDir = row.iv2 === "A" ? `< ${MANIPULATION2_THRESHOLD}` : `> ${MANIPULATION2_THRESHOLD}`;
+                  return (
+                    <tr
+                      key={row.prolific_id}
+                      className="border-t border-slate-100 transition hover:bg-teal-50/30"
+                    >
+                      <td className="sticky left-0 bg-white px-4 py-3 font-mono text-xs text-slate-800">
+                        {row.prolific_id}
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <span
+                          className="inline-block rounded-md px-2 py-0.5 text-xs font-semibold text-white"
+                          style={{ backgroundColor: IV_COLORS[row.iv1 as "A" | "B"]?.fill ?? "#94a3b8" }}
+                        >
+                          {row.iv1}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <span
+                          className="inline-block rounded-md px-2 py-0.5 text-xs font-semibold text-white"
+                          style={{ backgroundColor: IV_COLORS[row.iv2 as "A" | "B"]?.fill ?? "#94a3b8" }}
+                        >
+                          {row.iv2}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <span className="inline-block rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-700">
+                          {formatScore(m2)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-center text-xs text-slate-500">
+                        {expectedDir}
+                      </td>
+                      {constructs.map((c) => (
+                        <td key={c.id} className="px-3 py-3 text-right">
+                          <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900">
+                            {formatScore(row.construct_averages[c.id])}
+                          </span>
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )
+      ) : null}
+    </div>
+  );
+}
+
+function IncorrectRespondersPanel({
+  rows,
+  constructs,
+  manipulation2Construct,
+}: {
+  rows: AdminStatsParticipantRow[];
+  constructs: AdminConstructDefinition[];
+  manipulation2Construct: AdminConstructDefinition | null;
+}) {
+  const [expanded, setExpanded] = useState(true);
+
+  const incorrectRows = rows.filter((row) => {
+    const answer = row.response_values["stage_7.MANIPULATION_IV1"];
+    return answer !== MANIPULATION1_CORRECT[row.iv1];
+  });
+
+  const incorrectA = incorrectRows.filter((r) => r.iv1 === "A");
+  const incorrectB = incorrectRows.filter((r) => r.iv1 === "B");
+
+  return (
+    <div className="rounded-[1.65rem] border border-red-100 bg-red-50/40 p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="rounded-full border border-red-200 bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-700">
+              Incorrect Responders
+            </span>
+            <span className="text-sm font-semibold text-slate-700">
+              n = {incorrectRows.length}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-3 text-xs text-slate-600">
+            <span>
+              <span className="font-semibold" style={{ color: IV_COLORS.A.fill }}>IV1 A</span>
+              {" "}incorrect (answered Yes or Don&apos;t recall):{" "}
+              <span className="font-semibold text-red-700">{incorrectA.length}</span>
+            </span>
+            <span>·</span>
+            <span>
+              <span className="font-semibold" style={{ color: IV_COLORS.B.fill }}>IV1 B</span>
+              {" "}incorrect (answered No or Don&apos;t recall):{" "}
+              <span className="font-semibold text-red-700">{incorrectB.length}</span>
+            </span>
+          </div>
+        </div>
+        <button
+          type="button"
+          className="secondary-button shrink-0 px-4 py-2 text-xs"
+          onClick={() => setExpanded((p) => !p)}
+        >
+          {expanded ? "Collapse" : "Expand"}
+        </button>
+      </div>
+
+      {expanded ? (
+        incorrectRows.length === 0 ? (
+          <div className="mt-4 rounded-[1.25rem] border border-emerald-200 bg-emerald-50 px-4 py-6 text-center text-sm font-semibold text-emerald-700">
+            All participants answered correctly.
+          </div>
+        ) : (
+          <div className="mt-4 overflow-x-auto rounded-[1.25rem] border border-red-100 bg-white">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50">
+                  <th className="sticky left-0 bg-slate-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.11em] text-slate-500">
+                    Participant
+                  </th>
+                  <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-[0.11em] text-slate-500">
+                    IV1
+                  </th>
+                  <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-[0.11em] text-slate-500">
+                    IV2
+                  </th>
+                  <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-[0.11em] text-slate-500">
+                    Answer
+                  </th>
+                  <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-[0.11em] text-slate-500">
+                    Expected
+                  </th>
+                  {manipulation2Construct ? (
+                    <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-[0.11em] text-teal-600">
+                      Manip 2 Avg
+                    </th>
+                  ) : null}
+                  {constructs.map((c) => (
+                    <th
+                      key={c.id}
+                      className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-[0.11em] text-slate-500"
+                      title={c.id}
+                    >
+                      {c.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {incorrectRows.map((row) => {
+                  const answer = normalizeManipulationChoiceLabel(
+                    row.response_values["stage_7.MANIPULATION_IV1"],
+                  );
+                  const expected = normalizeManipulationChoiceLabel(
+                    MANIPULATION1_CORRECT[row.iv1],
+                  );
+                  return (
+                    <tr
+                      key={row.prolific_id}
+                      className="border-t border-slate-100 transition hover:bg-red-50/30"
+                    >
+                      <td className="sticky left-0 bg-white px-4 py-3 font-mono text-xs text-slate-800">
+                        {row.prolific_id}
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <span
+                          className="inline-block rounded-md px-2 py-0.5 text-xs font-semibold text-white"
+                          style={{ backgroundColor: IV_COLORS[row.iv1 as "A" | "B"]?.fill ?? "#94a3b8" }}
+                        >
+                          {row.iv1}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <span className="inline-block rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                          {row.iv2}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <span className="inline-block rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-700">
+                          {answer}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <span className="inline-block rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                          {expected}
+                        </span>
+                      </td>
+                      {manipulation2Construct ? (
+                        <td className="px-3 py-3 text-right">
+                          <span className="rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-xs font-semibold text-teal-800">
+                            {formatScore(row.construct_averages[manipulation2Construct.id])}
+                          </span>
+                        </td>
+                      ) : null}
+                      {constructs.map((c) => {
+                        const avg = row.construct_averages[c.id];
+                        return (
+                          <td key={c.id} className="px-3 py-3 text-right">
+                            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900">
+                              {formatScore(avg)}
+                            </span>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )
+      ) : null}
+    </div>
+  );
+}
+
+function IncorrectRespondersManip1And2Panel({
+  rows,
+  constructs,
+  manipulation2Construct,
+}: {
+  rows: AdminStatsParticipantRow[];
+  constructs: AdminConstructDefinition[];
+  manipulation2Construct: AdminConstructDefinition | null;
+}) {
+  const [expanded, setExpanded] = useState(true);
+
+  const incorrectRows = rows.filter((row) => {
+    const m1Wrong = row.response_values["stage_7.MANIPULATION_IV1"] !== MANIPULATION1_CORRECT[row.iv1];
+    const m2 = row.construct_averages.MANIPULATION_IV2;
+    const m2Wrong =
+      typeof m2 === "number" &&
+      ((row.iv2 === "A" && m2 < MANIPULATION2_THRESHOLD) ||
+        (row.iv2 === "B" && m2 > MANIPULATION2_THRESHOLD));
+    return m1Wrong && m2Wrong;
+  });
+
+  return (
+    <div className="rounded-[1.65rem] border border-purple-100 bg-purple-50/30 p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="rounded-full border border-purple-300 bg-purple-100 px-2.5 py-0.5 text-xs font-semibold text-purple-800">
+              Both Manipulations — Incorrect Responders
+            </span>
+            <span className="text-sm font-semibold text-slate-700">
+              n = {incorrectRows.length}
+            </span>
+          </div>
+          <div className="text-xs text-slate-600">
+            Failed both Manipulation 1 (IV1) and Manipulation 2 (IV2) checks simultaneously.
+          </div>
+        </div>
+        <button
+          type="button"
+          className="secondary-button shrink-0 px-4 py-2 text-xs"
+          onClick={() => setExpanded((p) => !p)}
+        >
+          {expanded ? "Collapse" : "Expand"}
+        </button>
+      </div>
+
+      {expanded ? (
+        incorrectRows.length === 0 ? (
+          <div className="mt-4 rounded-[1.25rem] border border-emerald-200 bg-emerald-50 px-4 py-6 text-center text-sm font-semibold text-emerald-700">
+            No participants failed both checks.
+          </div>
+        ) : (
+          <div className="mt-4 overflow-x-auto rounded-[1.25rem] border border-purple-100 bg-white">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50">
+                  <th className="sticky left-0 bg-slate-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.11em] text-slate-500">
+                    Participant
+                  </th>
+                  <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-[0.11em] text-slate-500">
+                    IV1
+                  </th>
+                  <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-[0.11em] text-slate-500">
+                    IV2
+                  </th>
+                  <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-[0.11em] text-red-600">
+                    Manip 1 Answer
+                  </th>
+                  <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-[0.11em] text-slate-500">
+                    M1 Expected
+                  </th>
+                  {manipulation2Construct ? (
+                    <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-[0.11em] text-red-600">
+                      Manip 2 Avg
+                    </th>
+                  ) : null}
+                  <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-[0.11em] text-slate-500">
+                    M2 Expected
+                  </th>
+                  {constructs.map((c) => (
+                    <th
+                      key={c.id}
+                      className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-[0.11em] text-slate-500"
+                      title={c.id}
+                    >
+                      {c.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {incorrectRows.map((row) => {
+                  const m1Answer = normalizeManipulationChoiceLabel(
+                    row.response_values["stage_7.MANIPULATION_IV1"],
+                  );
+                  const m1Expected = normalizeManipulationChoiceLabel(MANIPULATION1_CORRECT[row.iv1]);
+                  const m2 = row.construct_averages.MANIPULATION_IV2 as number;
+                  const m2ExpectedDir = row.iv2 === "A" ? `≥ ${MANIPULATION2_THRESHOLD}` : `≤ ${MANIPULATION2_THRESHOLD}`;
+                  return (
+                    <tr
+                      key={row.prolific_id}
+                      className="border-t border-slate-100 transition hover:bg-purple-50/30"
+                    >
+                      <td className="sticky left-0 bg-white px-4 py-3 font-mono text-xs text-slate-800">
+                        {row.prolific_id}
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <span
+                          className="inline-block rounded-md px-2 py-0.5 text-xs font-semibold text-white"
+                          style={{ backgroundColor: IV_COLORS[row.iv1 as "A" | "B"]?.fill ?? "#94a3b8" }}
+                        >
+                          {row.iv1}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <span
+                          className="inline-block rounded-md px-2 py-0.5 text-xs font-semibold text-white"
+                          style={{ backgroundColor: IV_COLORS[row.iv2 as "A" | "B"]?.fill ?? "#94a3b8" }}
+                        >
+                          {row.iv2}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <span className="inline-block rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-700">
+                          {m1Answer}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <span className="inline-block rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                          {m1Expected}
+                        </span>
+                      </td>
+                      {manipulation2Construct ? (
+                        <td className="px-3 py-3 text-center">
+                          <span className="inline-block rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-700">
+                            {formatScore(m2)}
+                          </span>
+                        </td>
+                      ) : null}
+                      <td className="px-3 py-3 text-center text-xs text-slate-500">
+                        {m2ExpectedDir}
+                      </td>
+                      {constructs.map((c) => (
+                        <td key={c.id} className="px-3 py-3 text-right">
+                          <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900">
+                            {formatScore(row.construct_averages[c.id])}
+                          </span>
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )
+      ) : null}
+    </div>
+  );
+}
+
+function ConstructPairPanel({ group, ivMode }: { group: ComparisonGroup; ivMode: IvMode }) {
+  const isPre = group.left?.id.startsWith("PRE_");
+  const isPost = group.right?.id.startsWith("POST_");
+  const overallDelta =
+    isPre &&
+    isPost &&
+    typeof group.left?.overallMean === "number" &&
+    typeof group.right?.overallMean === "number"
+      ? group.right.overallMean - group.left.overallMean
+      : null;
+
+  const ivLabel = ivMode.toUpperCase();
+
+  return (
+    <div className="min-w-0 rounded-[1.65rem] border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <div className="text-base font-semibold text-slate-950">
+            {group.familyLabel}
+          </div>
+          <div className="mt-0.5 text-xs text-slate-500">
+            Construct averages compared by {ivLabel} condition
+          </div>
+        </div>
+        <div className="flex flex-wrap items-start gap-2">
+          {overallDelta !== null ? (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-right">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Overall Post − Pre
+              </div>
+              <div
+                className={[
+                  "mt-0.5 text-base font-semibold",
+                  overallDelta > 0 ? "text-emerald-700" : overallDelta < 0 ? "text-red-700" : "text-slate-700",
+                ].join(" ")}
+              >
+                {overallDelta >= 0 ? "+" : ""}
+                {overallDelta.toFixed(2)}
+              </div>
+            </div>
+          ) : null}
+          <span className="eyebrow">{group.familyKey}</span>
+        </div>
+      </div>
+
+      {/* Pre/Post label row */}
+      {isPre && isPost ? (
+        <div className="mb-3 grid grid-cols-2 gap-3">
+          <div className="rounded-lg bg-indigo-50 px-3 py-1.5 text-center text-xs font-semibold uppercase tracking-[0.12em] text-indigo-700">
+            Pre-Exposure
+          </div>
+          <div className="rounded-lg bg-emerald-50 px-3 py-1.5 text-center text-xs font-semibold uppercase tracking-[0.12em] text-emerald-700">
+            Post-Exposure
+          </div>
+        </div>
+      ) : null}
+
+      <div className="grid gap-4 md:grid-cols-2">
+        {group.left ? (
+          <TwoConditionAverageChart
+            title={group.left.label}
+            subtitle={group.left.id}
+            maxValue={group.left.maxValue}
+            overallMean={group.left.overallMean}
+            conditionAMean={group.left.conditionAMean}
+            conditionBMean={group.left.conditionBMean}
+            ivLabel={ivLabel}
+          />
+        ) : null}
+        {group.right ? (
+          <TwoConditionAverageChart
+            title={group.right.label}
+            subtitle={group.right.id}
+            maxValue={group.right.maxValue}
+            overallMean={group.right.overallMean}
+            conditionAMean={group.right.conditionAMean}
+            conditionBMean={group.right.conditionBMean}
+            ivLabel={ivLabel}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/* ── Data grid helpers ── */
 
 function AverageCell({ value }: { value: number | null }) {
   return (
@@ -529,15 +1079,12 @@ function SimpleCell({ value }: { value: string }) {
 
 function FlagCell({ value }: { value: string }) {
   const hasValue = value === "Has";
-
   return (
     <div className="flex h-full items-center px-2">
       <span
         className={[
           "rounded-full px-2.5 py-1 text-xs font-semibold",
-          hasValue
-            ? "bg-emerald-50 text-emerald-800"
-            : "bg-slate-100 text-slate-600",
+          hasValue ? "bg-emerald-50 text-emerald-800" : "bg-slate-100 text-slate-600",
         ].join(" ")}
       >
         {value}
@@ -552,16 +1099,8 @@ function openTextDetail(
   title: string,
   content: unknown,
 ) {
-  if (!hasNonEmptyString(content)) {
-    return;
-  }
-
-  setDetailState({
-    kind: "text",
-    participantId,
-    title,
-    content,
-  });
+  if (!hasNonEmptyString(content)) return;
+  setDetailState({ kind: "text", participantId, title, content });
 }
 
 function openConstructDetail(
@@ -571,378 +1110,46 @@ function openConstructDetail(
   sourceRow: AdminStatsParticipantRow,
   responseColumnByKey: Map<string, { sourceKey: string }>,
 ) {
-  if (!construct) {
-    return;
-  }
-
+  if (!construct) return;
   const values = construct.questionColumnKeys.map((columnKey) => ({
     key: columnKey,
     sourceKey: responseColumnByKey.get(columnKey)?.sourceKey ?? columnKey,
     value: sourceRow.response_values[columnKey],
   }));
-
-  setDetailState({
-    kind: "construct",
-    participantId,
-    construct,
-    values,
-  });
+  setDetailState({ kind: "construct", participantId, construct, values });
 }
 
-function buildSheetRows(rows: AdminStatsParticipantRow[]) {
-  return rows.map<SheetRow>((row) => ({
-    id: row.prolific_id,
-    prolific_id: row.prolific_id,
-    iv1: row.iv1,
-    iv2: row.iv2,
-    manipulation1: normalizeManipulationChoiceLabel(
-      row.response_values["stage_7.MANIPULATION_IV1"],
-    ),
-    manipulation2:
-      typeof row.construct_averages.MANIPULATION_IV2 === "number"
-        ? row.construct_averages.MANIPULATION_IV2
-        : null,
-    feedback_content_flag: hasNonEmptyString(
-      row.response_values["stage_6.FEEDBACK_CONTENT"],
-    )
-      ? "Has"
-      : "No",
-    feedback_reason_flag: hasNonEmptyString(
-      row.response_values["stage_7.FEEDBACK_REASON"],
-    )
-      ? "Has"
-      : "No",
-    __source: row,
-  }));
-}
+/* ── Main component ── */
 
-function TwoConditionAverageChart({
-  title,
-  subtitle,
-  maxValue,
-  overallMean,
-  conditionAMean,
-  conditionBMean,
-}: {
-  title: string;
-  subtitle?: string;
-  maxValue: number;
-  overallMean: number | null;
-  conditionAMean: number | null;
-  conditionBMean: number | null;
-}) {
-  const chartData = [
-    {
-      condition: conditionMeta.A.label,
-      value: conditionAMean ?? 0,
-      fill: conditionMeta.A.fill,
-    },
-    {
-      condition: conditionMeta.B.label,
-      value: conditionBMean ?? 0,
-      fill: conditionMeta.B.fill,
-    },
-  ];
-
-  return (
-    <div className="min-w-0 rounded-[1.35rem] border border-slate-200 bg-white/80 p-4 shadow-sm">
-      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 space-y-1">
-          <div className="text-base font-semibold text-slate-950">{title}</div>
-          {subtitle ? (
-            <div className="break-words text-sm text-slate-600">{subtitle}</div>
-          ) : null}
-        </div>
-        <div className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-left sm:w-auto sm:text-right">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-            Overall Avg
-          </div>
-          <div className="mt-1 text-lg font-semibold text-slate-950">
-            {formatScore(overallMean)}
-          </div>
-          <div className="text-xs text-slate-500">/ {maxValue}</div>
-        </div>
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-            A
-          </div>
-          <div className="mt-1 text-base font-semibold text-slate-950">
-            {formatScore(conditionAMean)}
-          </div>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-            B
-          </div>
-          <div className="mt-1 text-base font-semibold text-slate-950">
-            {formatScore(conditionBMean)}
-          </div>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-            Delta
-          </div>
-          <div className="mt-1 text-base font-semibold text-slate-950">
-            {conditionAMean !== null && conditionBMean !== null
-              ? (conditionAMean - conditionBMean).toFixed(2)
-              : "—"}
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-4 h-56 rounded-[1.1rem] border border-slate-200 bg-slate-50/70 p-2">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            data={chartData}
-            layout="vertical"
-            margin={{ top: 8, right: 28, left: 10, bottom: 0 }}
-          >
-            <CartesianGrid stroke="#e2e8f0" horizontal={false} />
-            <XAxis
-              type="number"
-              domain={[0, maxValue]}
-              tick={{ fill: "#64748b", fontSize: 12 }}
-            />
-            <YAxis
-              type="category"
-              dataKey="condition"
-              width={88}
-              tick={{ fill: "#334155", fontSize: 12 }}
-            />
-            <Tooltip formatter={defaultTooltipFormatter} />
-            {overallMean !== null ? (
-              <ReferenceLine
-                x={overallMean}
-                stroke="#475569"
-                strokeDasharray="4 4"
-                label={{
-                  value: `Overall ${overallMean.toFixed(2)}`,
-                  position: "insideTopRight",
-                  fill: "#475569",
-                  fontSize: 11,
-                }}
-              />
-            ) : null}
-            <Bar dataKey="value" radius={[0, 999, 999, 0]} maxBarSize={28}>
-              {chartData.map((entry) => (
-                <Cell key={entry.condition} fill={entry.fill} />
-              ))}
-              <LabelList
-                dataKey="value"
-                position="right"
-                formatter={(value: unknown) =>
-                  typeof value === "number" ? value.toFixed(2) : String(value)
-                }
-              />
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-      <div className="mt-2 text-xs text-slate-500">
-        Dashed line marks the overall mean and the numeric overall average is
-        shown above.
-      </div>
-    </div>
-  );
-}
-
-function Manipulation1Chart({ rows }: { rows: AdminStatsParticipantRow[] }) {
-  const chartData = buildManipulation1ChartData(rows);
-  const maxValue = Math.max(
-    1,
-    ...chartData.flatMap((item) => [item.A, item.B]),
-  );
-
-  return (
-    <div className="min-w-0 rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="space-y-1">
-        <div className="text-base font-semibold text-slate-950">
-          Manipulation 1
-        </div>
-        <div className="text-sm text-slate-600">Counts by IV1 condition</div>
-      </div>
-
-      <div className="mt-4 h-72">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            data={chartData}
-            layout="vertical"
-            margin={{ top: 8, right: 32, left: 10, bottom: 0 }}
-            barCategoryGap={14}
-          >
-            <CartesianGrid stroke="#e2e8f0" horizontal={false} />
-            <XAxis
-              type="number"
-              domain={[0, maxValue]}
-              tick={{ fill: "#64748b", fontSize: 12 }}
-            />
-            <YAxis
-              type="category"
-              dataKey="option"
-              width={100}
-              tick={{ fill: "#334155", fontSize: 12 }}
-            />
-            <Tooltip />
-            <Bar
-              dataKey="A"
-              name={conditionMeta.A.label}
-              fill={conditionMeta.A.fill}
-              radius={[0, 999, 999, 0]}
-              maxBarSize={18}
-            >
-              <LabelList dataKey="A" position="right" formatter={formatCount} />
-            </Bar>
-            <Bar
-              dataKey="B"
-              name={conditionMeta.B.label}
-              fill={conditionMeta.B.fill}
-              radius={[0, 999, 999, 0]}
-              maxBarSize={18}
-            >
-              <LabelList dataKey="B" position="right" formatter={formatCount} />
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );
-}
-
-function ConstructPairPanel({
-  group,
-  ivMode,
-}: {
-  group: ComparisonGroup;
-  ivMode: IvMode;
-}) {
-  const pairDelta =
-    group.left?.id.startsWith("PRE_") &&
-    group.right?.id.startsWith("POST_") &&
-    typeof group.left.overallMean === "number" &&
-    typeof group.right.overallMean === "number"
-      ? group.right.overallMean - group.left.overallMean
-      : null;
-
-  return (
-    <div className="min-w-0 rounded-[1.65rem] border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="mb-4 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <div className="text-lg font-semibold text-slate-950">
-            {group.familyLabel}
-          </div>
-          <div className="mt-1 text-sm text-slate-600">
-            Compared by {ivMode.toUpperCase()} condition
-          </div>
-        </div>
-        <div className="flex min-w-0 flex-wrap items-start gap-2 sm:items-center sm:justify-end">
-          {pairDelta !== null ? (
-            <div className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-left sm:w-auto sm:text-right">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                Overall Delta
-              </div>
-              <div className="mt-1 text-base font-semibold text-slate-950">
-                {pairDelta >= 0 ? "+" : ""}
-                {pairDelta.toFixed(2)}
-              </div>
-              <div className="text-xs text-slate-500">Post - Pre</div>
-            </div>
-          ) : null}
-          <div className="eyebrow">{group.familyKey}</div>
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        {group.left ? (
-          <TwoConditionAverageChart
-            title={group.left.label}
-            subtitle={group.left.id}
-            maxValue={group.left.maxValue}
-            overallMean={group.left.overallMean}
-            conditionAMean={group.left.conditionAMean}
-            conditionBMean={group.left.conditionBMean}
-          />
-        ) : null}
-        {group.right ? (
-          <TwoConditionAverageChart
-            title={group.right.label}
-            subtitle={group.right.id}
-            maxValue={group.right.maxValue}
-            overallMean={group.right.overallMean}
-            conditionAMean={group.right.conditionAMean}
-            conditionBMean={group.right.conditionBMean}
-          />
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function SingleConstructPanel({
-  group,
-  ivMode,
-}: {
-  group: ComparisonGroup;
-  ivMode: IvMode;
-}) {
-  if (!group.left) {
-    return null;
-  }
-
-  return (
-    <TwoConditionAverageChart
-      title={group.left.label}
-      subtitle={`${group.left.id} average by ${ivMode.toUpperCase()} condition`}
-      maxValue={group.left.maxValue}
-      overallMean={group.left.overallMean}
-      conditionAMean={group.left.conditionAMean}
-      conditionBMean={group.left.conditionBMean}
-    />
-  );
-}
-
-export function AdminStatsDashboard({
-  initialData,
-  onLogout,
-}: AdminStatsDashboardProps) {
+export function AdminStatsDashboard({ initialData, onLogout }: AdminStatsDashboardProps) {
   const [statsData, setStatsData] = useState(initialData);
   const [refreshing, setRefreshing] = useState(false);
-  const [summaryExpanded, setSummaryExpanded] = useState(false);
   const [ivMode, setIvMode] = useState<IvMode>("iv1");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [detailState, setDetailState] = useState<DetailState>(null);
   const [expandedMobileCards, setExpandedMobileCards] = useState<Set<string>>(
     () => new Set(),
   );
+  const [sheetSearch, setSheetSearch] = useState("");
+  const [sheetSortColumns, setSheetSortColumns] = useState<readonly SortColumn[]>([]);
+  const [sheetIv1Filter, setSheetIv1Filter] = useState<"all" | "A" | "B">("all");
+  const [sheetIv2Filter, setSheetIv2Filter] = useState<"all" | "A" | "B">("all");
 
   const completedRows = useMemo(
     () => statsData.rows.filter((row) => row.status === "completed"),
     [statsData.rows],
   );
   const constructMap = useMemo(
-    () =>
-      new Map(
-        statsData.constructs.map((construct) => [construct.id, construct]),
-      ),
+    () => new Map(statsData.constructs.map((c) => [c.id, c])),
     [statsData.constructs],
   );
   const responseColumnByKey = useMemo(
-    () =>
-      new Map(statsData.responseColumns.map((column) => [column.key, column])),
+    () => new Map(statsData.responseColumns.map((col) => [col.key, col])),
     [statsData.responseColumns],
   );
-  const sheetRows = useMemo(
-    () => buildSheetRows(completedRows),
-    [completedRows],
-  );
+  const sheetRows = useMemo(() => buildSheetRows(completedRows), [completedRows]);
   const averageConstructs = useMemo(
-    () =>
-      statsData.constructs.filter(
-        (construct) => construct.id !== "MANIPULATION_IV2",
-      ),
+    () => statsData.constructs.filter((c) => c.id !== "MANIPULATION_IV2"),
     [statsData.constructs],
   );
   const comparisonGroups = useMemo(
@@ -955,6 +1162,37 @@ export function AdminStatsDashboard({
   const manipulation2Construct = useMemo(
     () => constructMap.get("MANIPULATION_IV2") ?? null,
     [constructMap],
+  );
+
+  // Manipulation 2 averages by IV2 condition
+  const manipulation2Overall = useMemo(
+    () =>
+      average(
+        completedRows
+          .map((r) => r.construct_averages.MANIPULATION_IV2)
+          .filter((v): v is number => typeof v === "number"),
+      ),
+    [completedRows],
+  );
+  const manipulation2A = useMemo(
+    () =>
+      average(
+        completedRows
+          .filter((r) => r.iv2 === "A")
+          .map((r) => r.construct_averages.MANIPULATION_IV2)
+          .filter((v): v is number => typeof v === "number"),
+      ),
+    [completedRows],
+  );
+  const manipulation2B = useMemo(
+    () =>
+      average(
+        completedRows
+          .filter((r) => r.iv2 === "B")
+          .map((r) => r.construct_averages.MANIPULATION_IV2)
+          .filter((v): v is number => typeof v === "number"),
+      ),
+    [completedRows],
   );
 
   const gridColumns = useMemo(() => {
@@ -974,53 +1212,43 @@ export function AdminStatsDashboard({
         key: "iv1",
         name: "IV1",
         frozen: true,
-        width: 72,
+        width: 60,
         renderCell: ({ row }) => <SimpleCell value={String(row.iv1)} />,
       },
       {
         key: "iv2",
         name: "IV2",
         frozen: true,
-        width: 72,
+        width: 60,
         renderCell: ({ row }) => <SimpleCell value={String(row.iv2)} />,
       },
       {
         key: "manipulation1",
-        name: "Manipulation 1",
-        width: 140,
-        renderCell: ({ row }) => (
-          <SimpleCell value={String(row.manipulation1)} />
-        ),
+        name: "Manip. 1",
+        width: 130,
+        renderCell: ({ row }) => <SimpleCell value={String(row.manipulation1)} />,
       },
       {
         key: "feedback_content_flag",
-        name: "Feedback Content",
-        width: 140,
-        renderCell: ({ row }) => (
-          <FlagCell value={String(row.feedback_content_flag)} />
-        ),
+        name: "Feedback",
+        width: 110,
+        renderCell: ({ row }) => <FlagCell value={String(row.feedback_content_flag)} />,
       },
       {
         key: "feedback_reason_flag",
-        name: "Feedback Reason",
-        width: 140,
-        renderCell: ({ row }) => (
-          <FlagCell value={String(row.feedback_reason_flag)} />
-        ),
+        name: "Reason",
+        width: 110,
+        renderCell: ({ row }) => <FlagCell value={String(row.feedback_reason_flag)} />,
       },
     ];
 
     if (manipulation2Construct) {
       baseColumns.push({
         key: `avg:${manipulation2Construct.id}`,
-        name: "Manipulation 2",
-        width: 140,
+        name: "Manip. 2",
+        width: 120,
         renderCell: ({ row }) => (
-          <AverageCell
-            value={
-              typeof row.manipulation2 === "number" ? row.manipulation2 : null
-            }
-          />
+          <AverageCell value={typeof row.manipulation2 === "number" ? row.manipulation2 : null} />
         ),
       });
     }
@@ -1029,7 +1257,7 @@ export function AdminStatsDashboard({
       ...averageConstructs.map<Column<SheetRow>>((construct) => ({
         key: `avg:${construct.id}`,
         name: construct.label,
-        width: 156,
+        width: 150,
         renderCell: ({ row }) => (
           <AverageCell
             value={
@@ -1046,59 +1274,70 @@ export function AdminStatsDashboard({
   }, [averageConstructs, manipulation2Construct]);
 
   const dataGridRows = useMemo(() => {
-    const rowsWithAverages = sheetRows.map((row) => {
+    const allRows = sheetRows.map((row) => {
       const nextRow: SheetRow = { ...row };
-
       for (const construct of averageConstructs) {
         nextRow[`avg:${construct.id}`] =
           row.__source.construct_averages[construct.id] ?? null;
       }
-
       if (manipulation2Construct) {
         nextRow[`avg:${manipulation2Construct.id}`] =
           row.__source.construct_averages[manipulation2Construct.id] ?? null;
       }
-
       return nextRow;
     });
 
-    return rowsWithAverages.sort((left, right) => {
-      const feedbackContentDelta =
-        Number(right.feedback_content_flag === "Has") -
-        Number(left.feedback_content_flag === "Has");
-
-      if (feedbackContentDelta !== 0) {
-        return feedbackContentDelta;
-      }
-
-      const feedbackReasonDelta =
-        Number(right.feedback_reason_flag === "Has") -
-        Number(left.feedback_reason_flag === "Has");
-
-      if (feedbackReasonDelta !== 0) {
-        return feedbackReasonDelta;
-      }
-
-      return left.prolific_id.localeCompare(right.prolific_id);
+    const normalizedSearch = sheetSearch.trim().toLowerCase();
+    const filtered = allRows.filter((row) => {
+      if (sheetIv1Filter !== "all" && row.iv1 !== sheetIv1Filter) return false;
+      if (sheetIv2Filter !== "all" && row.iv2 !== sheetIv2Filter) return false;
+      if (normalizedSearch && !row.prolific_id.toLowerCase().includes(normalizedSearch)) return false;
+      return true;
     });
-  }, [averageConstructs, manipulation2Construct, sheetRows]);
+
+    if (sheetSortColumns.length === 0) {
+      return [...filtered].sort((left, right) => {
+        const fbDelta =
+          Number(right.feedback_content_flag === "Has") -
+          Number(left.feedback_content_flag === "Has");
+        if (fbDelta !== 0) return fbDelta;
+        const rDelta =
+          Number(right.feedback_reason_flag === "Has") -
+          Number(left.feedback_reason_flag === "Has");
+        if (rDelta !== 0) return rDelta;
+        return left.prolific_id.localeCompare(right.prolific_id);
+      });
+    }
+
+    return [...filtered].sort((a, b) => {
+      for (const sort of sheetSortColumns) {
+        const aVal = a[sort.columnKey];
+        const bVal = b[sort.columnKey];
+        let cmp = 0;
+        if (typeof aVal === "number" && typeof bVal === "number") {
+          cmp = aVal - bVal;
+        } else {
+          cmp = String(aVal ?? "").localeCompare(String(bVal ?? ""));
+        }
+        if (cmp !== 0) return sort.direction === "ASC" ? cmp : -cmp;
+      }
+      return 0;
+    });
+  }, [averageConstructs, manipulation2Construct, sheetRows, sheetSearch, sheetSortColumns, sheetIv1Filter, sheetIv2Filter]);
 
   async function refreshStatistics() {
     setRefreshing(true);
     setErrorMessage(null);
-
     try {
       const response = await fetch("/api/admin/stats");
       const payload = (await response.json()) as
-        | AdminStatisticsResponse
+        | typeof initialData
         | ApiErrorResponse;
-
       if (!response.ok || !payload.ok) {
         throw new Error(
           "message" in payload ? payload.message : "Unable to load statistics.",
         );
       }
-
       setStatsData(payload);
     } catch (error) {
       setErrorMessage(
@@ -1115,15 +1354,10 @@ export function AdminStatsDashboard({
   }
 
   function toggleMobileCard(rowId: string) {
-    setExpandedMobileCards((previous) => {
-      const next = new Set(previous);
-
-      if (next.has(rowId)) {
-        next.delete(rowId);
-      } else {
-        next.add(rowId);
-      }
-
+    setExpandedMobileCards((prev) => {
+      const next = new Set(prev);
+      if (next.has(rowId)) next.delete(rowId);
+      else next.add(rowId);
       return next;
     });
   }
@@ -1138,7 +1372,6 @@ export function AdminStatsDashboard({
       );
       return;
     }
-
     if (args.column.key === "feedback_reason_flag") {
       openTextDetail(
         setDetailState,
@@ -1148,11 +1381,7 @@ export function AdminStatsDashboard({
       );
       return;
     }
-
-    if (!args.column.key.startsWith("avg:")) {
-      return;
-    }
-
+    if (!args.column.key.startsWith("avg:")) return;
     const constructId = args.column.key.replace(/^avg:/, "");
     openConstructDetail(
       setDetailState,
@@ -1163,24 +1392,35 @@ export function AdminStatsDashboard({
     );
   }
 
+  const { summary } = statsData;
+  const ivLabel = ivMode.toUpperCase();
+
   return (
     <>
       <div className="mx-auto flex min-h-svh w-full max-w-[96rem] flex-col gap-6 px-5 py-6 sm:px-8 lg:px-10">
+        {/* Header */}
         <div className="panel space-y-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="space-y-2">
-              <span className="eyebrow">Admin Statistics</span>
+              <span className="eyebrow">Admin · Statistics</span>
               <h1 className="text-3xl font-semibold tracking-tight text-slate-950">
                 Participant Statistics
               </h1>
-              <p className="body-copy">
-                Review the compact response sheet, construct averages, and
-                IV-based comparisons across successful participants.
+              <p className="body-copy max-w-xl">
+                Analysis based on{" "}
+                <span className="font-semibold text-slate-950">
+                  {completedRows.length} completed
+                </span>{" "}
+                participants — manipulation checks, construct averages, and
+                IV-level comparisons.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
               <Link href="/admin" className="secondary-button">
-                Participant Dashboard
+                All Participants
+              </Link>
+              <Link href="/admin/feedback" className="secondary-button">
+                Feedback
               </Link>
               <button
                 type="button"
@@ -1188,7 +1428,7 @@ export function AdminStatsDashboard({
                 onClick={() => void refreshStatistics()}
                 disabled={refreshing}
               >
-                {refreshing ? "Refreshing..." : "Refresh"}
+                {refreshing ? "Refreshing…" : "Refresh"}
               </button>
               <button
                 type="button"
@@ -1206,282 +1446,160 @@ export function AdminStatsDashboard({
             </div>
           ) : null}
 
-          <AdminSummaryPanels
-            summary={statsData.summary}
-            expanded={summaryExpanded}
-            onToggle={() => setSummaryExpanded((previous) => !previous)}
+          {/* Completion summary */}
+          <div className="grid gap-4 sm:grid-cols-3">
+            {[
+              {
+                label: "Completed",
+                value: summary.completed.total,
+                color: "text-emerald-950",
+                bg: "bg-emerald-50 border-emerald-200",
+              },
+              {
+                label: "Failed",
+                value: summary.failed.total,
+                color: "text-red-950",
+                bg: "bg-red-50 border-red-200",
+              },
+              {
+                label: "In Progress",
+                value: summary.in_progress.total,
+                color: "text-amber-950",
+                bg: "bg-amber-50 border-amber-200",
+              },
+            ].map(({ label, value, color, bg }) => (
+              <div key={label} className={`rounded-[1.5rem] border p-4 ${bg}`}>
+                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">
+                  {label}
+                </div>
+                <div className={`mt-1.5 text-3xl font-semibold ${color}`}>
+                  {value}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Manipulation Checks ── */}
+        <div className="panel space-y-5">
+          <div className="space-y-1.5">
+            <span className="eyebrow">Manipulation Checks</span>
+            <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
+              Manipulation 1 & 2 Verification
+            </h2>
+            <p className="body-copy-compact max-w-3xl">
+              Confirm that the experimental manipulations were perceived as
+              intended. Manipulation 1 is a choice question by IV1; Manipulation
+              2 is a Likert-scale average by IV2.
+            </p>
+          </div>
+
+          <div className="grid gap-5 lg:grid-cols-2">
+            {/* Manipulation 1 */}
+            <div className="rounded-[1.65rem] border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full border border-amber-300 bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+                      Manipulation 1
+                    </span>
+                    <span className="text-xs text-slate-500">by IV1</span>
+                  </div>
+                  <div className="mt-1.5 text-base font-semibold text-slate-950">
+                    Manipulation Check — System Notice Awareness
+                  </div>
+                  <div className="mt-0.5 text-xs text-slate-500">
+                    Choice response: Yes / No / Don&apos;t recall (by IV1 condition)
+                  </div>
+                </div>
+              </div>
+              <Manipulation1Chart rows={completedRows} />
+            </div>
+
+            {/* Manipulation 2 */}
+            <div className="rounded-[1.65rem] border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full border border-teal-300 bg-teal-100 px-2.5 py-0.5 text-xs font-semibold text-teal-800">
+                      Manipulation 2
+                    </span>
+                    <span className="text-xs text-slate-500">by IV2</span>
+                  </div>
+                  <div className="mt-1.5 text-base font-semibold text-slate-950">
+                    Manipulation Check — Feedback Salience
+                  </div>
+                  <div className="mt-0.5 text-xs text-slate-500">
+                    Likert average (/{manipulation2Construct?.maxValue ?? 7}) by
+                    IV2 condition
+                  </div>
+                </div>
+              </div>
+              <TwoConditionAverageChart
+                title="Manipulation 2 Avg"
+                maxValue={manipulation2Construct?.maxValue ?? 7}
+                overallMean={manipulation2Overall}
+                conditionAMean={manipulation2A}
+                conditionBMean={manipulation2B}
+                ivLabel="IV2"
+              />
+            </div>
+          </div>
+
+          <IncorrectRespondersPanel
+            rows={completedRows}
+            constructs={averageConstructs}
+            manipulation2Construct={manipulation2Construct}
+          />
+
+          <IncorrectRespondersManip2Panel
+            rows={completedRows}
+            constructs={averageConstructs}
+          />
+
+          <IncorrectRespondersManip1And2Panel
+            rows={completedRows}
+            constructs={averageConstructs}
+            manipulation2Construct={manipulation2Construct}
           />
         </div>
 
-        <div className="panel space-y-5">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div className="space-y-2">
-              <span className="eyebrow">Sheet</span>
-              <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
-                Success Participants
-              </h2>
-              <p className="body-copy-compact max-w-3xl">
-                Table columns are limited to participant identity, IVs,
-                manipulation checks, and construct averages. Click any `AVG`
-                cell to inspect its sub-item values.
-              </p>
-            </div>
-            <div className="text-sm text-slate-500">
-              {completedRows.length} success participants
-            </div>
-          </div>
-
-          <div className="md:hidden">
-            <div className="max-h-[70svh] overflow-x-hidden overflow-y-auto rounded-[1.5rem] border border-slate-200 bg-white/65 p-3">
-              <div className="space-y-3">
-                {dataGridRows.map((row) => (
-                  <div
-                    key={`mobile-${row.id}`}
-                    className="min-w-0 rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm"
-                  >
-                    <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="min-w-0">
-                        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                          Participant
-                        </div>
-                        <div className="mt-1 break-all font-mono text-sm text-slate-950">
-                          {row.prolific_id}
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <span className="chip chip-neutral max-w-full whitespace-normal break-words normal-case tracking-normal">
-                          IV1 {row.iv1}
-                        </span>
-                        <span className="chip chip-neutral max-w-full whitespace-normal break-words normal-case tracking-normal">
-                          IV2 {row.iv2}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2">
-                        <div
-                          className={`rounded-[1rem] border border-slate-200  px-3 py-2 ${row.feedback_content_flag === "Has" ? "bg-teal-300" : "bg-slate-50"}`}
-                        >
-                          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                            Feedback Content
-                          </div>
-                          <div className="mt-1 text-sm font-medium text-slate-900">
-                            {row.feedback_content_flag}
-                          </div>
-                        </div>
-                        <div
-                          className={`rounded-[1rem] border border-slate-200  px-3 py-2 ${row.feedback_reason_flag === "Has" ? "bg-teal-300" : "bg-slate-50"}`}
-                        >
-                          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                            Feedback Reason
-                          </div>
-                          <div className="mt-1 text-sm font-medium text-slate-900">
-                            {row.feedback_reason_flag}
-                          </div>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className="secondary-button w-full shrink-0 px-4 py-2 text-xs sm:w-auto"
-                        onClick={() => toggleMobileCard(row.id)}
-                      >
-                        {expandedMobileCards.has(row.id)
-                          ? "Collapse"
-                          : "Expand"}
-                      </button>
-                    </div>
-
-                    {expandedMobileCards.has(row.id) ? (
-                      <>
-                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                          <button
-                            type="button"
-                            className="rounded-[1.15rem] border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-slate-300 hover:bg-slate-100"
-                            onClick={() =>
-                              openTextDetail(
-                                setDetailState,
-                                row.prolific_id,
-                                "Feedback Content",
-                                row.__source.response_values[
-                                  "stage_6.FEEDBACK_CONTENT"
-                                ],
-                              )
-                            }
-                          >
-                            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                              Feedback Content
-                            </div>
-                            <div className="mt-1 text-sm font-medium text-slate-900">
-                              {row.feedback_content_flag}
-                            </div>
-                          </button>
-                          <button
-                            type="button"
-                            className="rounded-[1.15rem] border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-slate-300 hover:bg-slate-100"
-                            onClick={() =>
-                              openTextDetail(
-                                setDetailState,
-                                row.prolific_id,
-                                "Feedback Reason",
-                                row.__source.response_values[
-                                  "stage_7.FEEDBACK_REASON"
-                                ],
-                              )
-                            }
-                          >
-                            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                              Feedback Reason
-                            </div>
-                            <div className="mt-1 text-sm font-medium text-slate-900">
-                              {row.feedback_reason_flag}
-                            </div>
-                          </button>
-                        </div>
-
-                        <div className="mt-4">
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                            Construct Averages
-                          </div>
-                          <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                            {manipulation2Construct ? (
-                              <button
-                                type="button"
-                                className="rounded-[1.15rem] border border-slate-200 bg-amber-50 p-3 text-left transition hover:border-amber-300 hover:bg-amber-100/70"
-                                onClick={() =>
-                                  openConstructDetail(
-                                    setDetailState,
-                                    row.prolific_id,
-                                    manipulation2Construct,
-                                    row.__source,
-                                    responseColumnByKey,
-                                  )
-                                }
-                              >
-                                <div className="break-words text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-800">
-                                  Manipulation 2
-                                </div>
-                                <div className="mt-1 text-sm font-semibold text-amber-950">
-                                  {formatScore(row.manipulation2)}
-                                </div>
-                              </button>
-                            ) : null}
-                            {averageConstructs.map((construct) => (
-                              <button
-                                key={`mobile-avg-${row.id}-${construct.id}`}
-                                type="button"
-                                className="rounded-[1.15rem] border border-slate-200 bg-amber-50 p-3 text-left transition hover:border-amber-300 hover:bg-amber-100/70"
-                                onClick={() =>
-                                  openConstructDetail(
-                                    setDetailState,
-                                    row.prolific_id,
-                                    construct,
-                                    row.__source,
-                                    responseColumnByKey,
-                                  )
-                                }
-                              >
-                                <div className="break-words text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-800">
-                                  {construct.label}
-                                </div>
-                                <div className="mt-1 text-sm font-semibold text-amber-950">
-                                  {formatScore(
-                                    row.__source.construct_averages[
-                                      construct.id
-                                    ],
-                                  )}
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="hidden overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white md:block">
-            <DataGrid
-              columns={gridColumns}
-              rows={dataGridRows}
-              rowKeyGetter={(row) => row.id}
-              onCellClick={handleCellClick}
-              defaultColumnOptions={{
-                resizable: true,
-                sortable: false,
-              }}
-              rowHeight={44}
-              headerRowHeight={44}
-              className="rdg-light border-0 text-sm"
-              style={{ blockSize: "34rem" }}
-            />
-          </div>
-        </div>
-
+        {/* ── IV Comparison by Construct ── */}
         <div className="panel space-y-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="space-y-2">
-              <span className="eyebrow">Charts</span>
+            <div className="space-y-1.5">
+              <span className="eyebrow">Construct Averages</span>
               <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
                 IV Comparison by Construct
               </h2>
-              <p className="body-copy-compact max-w-4xl">
-                Manipulation charts are shown first. The construct grid below
-                keeps matching `Pre` and `Post` cards side by side for direct
-                comparison.
+              <p className="body-copy-compact max-w-3xl">
+                Items are grouped by construct. Pre and Post measures appear
+                side-by-side with overall delta. Use the IV selector to switch
+                between IV1 and IV2 comparisons.
               </p>
             </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-700">
+            <div className="shrink-0 space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                 Compare by IV
               </label>
-              <select
-                value={ivMode}
-                onChange={(event) =>
-                  setIvMode(event.currentTarget.value as IvMode)
-                }
-                className="block rounded-[1.25rem] border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-900 focus:ring-4 focus:ring-indigo-200/70"
-              >
-                <option value="iv1">IV1</option>
-                <option value="iv2">IV2</option>
-              </select>
+              <div className="flex overflow-hidden rounded-[1.25rem] border border-slate-300 bg-white">
+                {(["iv1", "iv2"] as IvMode[]).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setIvMode(mode)}
+                    className={[
+                      "px-5 py-2.5 text-sm font-semibold transition",
+                      ivMode === mode
+                        ? "bg-slate-950 text-white"
+                        : "text-slate-700 hover:bg-slate-50",
+                    ].join(" ")}
+                  >
+                    {mode.toUpperCase()}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 [&>*]:min-w-0">
-            <Manipulation1Chart rows={completedRows} />
-            <TwoConditionAverageChart
-              title="Manipulation 2"
-              subtitle="Average by IV2 condition"
-              maxValue={manipulation2Construct?.maxValue ?? 6}
-              overallMean={average(
-                completedRows
-                  .map((row) => row.construct_averages.MANIPULATION_IV2)
-                  .filter(
-                    (value): value is number => typeof value === "number",
-                  ),
-              )}
-              conditionAMean={average(
-                completedRows
-                  .filter((row) => row.iv2 === "A")
-                  .map((row) => row.construct_averages.MANIPULATION_IV2)
-                  .filter(
-                    (value): value is number => typeof value === "number",
-                  ),
-              )}
-              conditionBMean={average(
-                completedRows
-                  .filter((row) => row.iv2 === "B")
-                  .map((row) => row.construct_averages.MANIPULATION_IV2)
-                  .filter(
-                    (value): value is number => typeof value === "number",
-                  ),
-              )}
-            />
           </div>
 
           <div className="grid gap-4 [&>*]:min-w-0">
@@ -1496,44 +1614,229 @@ export function AdminStatsDashboard({
               ))}
             <div className="grid gap-4 md:grid-cols-2 [&>*]:min-w-0">
               {comparisonGroups
-                .filter((group) => group.layout === "single")
+                .filter((group) => group.layout === "single" && group.left)
                 .map((group) => (
-                  <SingleConstructPanel
+                  <div
                     key={`${ivMode}-${group.familyKey}`}
-                    group={group}
-                    ivMode={ivMode}
-                  />
+                    className="rounded-[1.65rem] border border-slate-200 bg-white p-5 shadow-sm"
+                  >
+                    <div className="mb-3 text-sm text-slate-500">
+                      {group.left?.id} — {ivLabel}
+                    </div>
+                    <TwoConditionAverageChart
+                      title={group.left?.label ?? group.familyLabel}
+                      maxValue={group.left?.maxValue ?? 7}
+                      overallMean={group.left?.overallMean ?? null}
+                      conditionAMean={group.left?.conditionAMean ?? null}
+                      conditionBMean={group.left?.conditionBMean ?? null}
+                      ivLabel={ivLabel}
+                    />
+                  </div>
                 ))}
             </div>
           </div>
         </div>
+
+        {/* ── Data Sheet ── */}
+        <div className="panel space-y-5">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div className="space-y-1.5">
+              <span className="eyebrow">Data Sheet</span>
+              <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
+                Completed Participants
+              </h2>
+              <p className="body-copy-compact max-w-3xl">
+                Identity, IV conditions, manipulation responses, and construct
+                averages. Click any{" "}
+                <span className="font-semibold">AVG</span> cell to inspect
+                sub-item values. Click column headers to sort.
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <input
+                type="text"
+                value={sheetSearch}
+                onChange={(e) => setSheetSearch(e.currentTarget.value)}
+                placeholder="Search participant ID…"
+                className="w-44 rounded-[1.25rem] border border-slate-300 bg-white px-4 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-900 focus:ring-4 focus:ring-indigo-200/70"
+              />
+              <select
+                value={sheetIv1Filter}
+                onChange={(e) => setSheetIv1Filter(e.currentTarget.value as "all" | "A" | "B")}
+                className="rounded-[1.25rem] border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-900 focus:ring-4 focus:ring-indigo-200/70"
+              >
+                <option value="all">IV1: All</option>
+                <option value="A">IV1: A</option>
+                <option value="B">IV1: B</option>
+              </select>
+              <select
+                value={sheetIv2Filter}
+                onChange={(e) => setSheetIv2Filter(e.currentTarget.value as "all" | "A" | "B")}
+                className="rounded-[1.25rem] border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-900 focus:ring-4 focus:ring-indigo-200/70"
+              >
+                <option value="all">IV2: All</option>
+                <option value="A">IV2: A</option>
+                <option value="B">IV2: B</option>
+              </select>
+              <span className="text-sm font-semibold text-slate-500">
+                {dataGridRows.length} / {completedRows.length}
+              </span>
+            </div>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden">
+            <div className="max-h-[70svh] overflow-y-auto overflow-x-hidden rounded-[1.5rem] border border-slate-200 bg-white/65 p-3">
+              <div className="space-y-3">
+                {dataGridRows.map((row) => (
+                  <div
+                    key={`mobile-${row.id}`}
+                    className="min-w-0 rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm"
+                  >
+                    <div className="flex min-w-0 items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="break-all font-mono text-xs text-slate-900">
+                          {row.prolific_id}
+                        </div>
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          <span className="chip chip-neutral normal-case tracking-normal">
+                            IV1 {row.iv1}
+                          </span>
+                          <span className="chip chip-neutral normal-case tracking-normal">
+                            IV2 {row.iv2}
+                          </span>
+                          <span
+                            className={[
+                              "chip normal-case tracking-normal",
+                              row.feedback_content_flag === "Has"
+                                ? "border-emerald-300 bg-emerald-100 text-emerald-800"
+                                : "chip-neutral",
+                            ].join(" ")}
+                          >
+                            Feedback: {row.feedback_content_flag}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="secondary-button shrink-0 px-3 py-1.5 text-xs"
+                        onClick={() => toggleMobileCard(row.id)}
+                      >
+                        {expandedMobileCards.has(row.id) ? "Collapse" : "Expand"}
+                      </button>
+                    </div>
+                    {expandedMobileCards.has(row.id) ? (
+                      <div className="mt-4 space-y-3">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="rounded-[1rem] border border-slate-200 bg-slate-50 p-3">
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                              Manipulation 1
+                            </div>
+                            <div className="mt-1 text-sm font-semibold text-slate-950">
+                              {row.manipulation1}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            className="rounded-[1rem] border border-slate-200 bg-amber-50 p-3 text-left transition hover:bg-amber-100"
+                            onClick={() =>
+                              openConstructDetail(
+                                setDetailState,
+                                row.prolific_id,
+                                manipulation2Construct ?? undefined,
+                                row.__source,
+                                responseColumnByKey,
+                              )
+                            }
+                          >
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-700">
+                              Manipulation 2
+                            </div>
+                            <div className="mt-1 text-sm font-semibold text-amber-950">
+                              {formatScore(row.manipulation2)}
+                            </div>
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {averageConstructs.map((construct) => (
+                            <button
+                              key={`mobile-${row.id}-${construct.id}`}
+                              type="button"
+                              className="rounded-[1rem] border border-slate-200 bg-amber-50 p-3 text-left transition hover:bg-amber-100"
+                              onClick={() =>
+                                openConstructDetail(
+                                  setDetailState,
+                                  row.prolific_id,
+                                  construct,
+                                  row.__source,
+                                  responseColumnByKey,
+                                )
+                              }
+                            >
+                              <div className="break-words text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-700">
+                                {construct.label}
+                              </div>
+                              <div className="mt-1 text-sm font-semibold text-amber-950">
+                                {formatScore(
+                                  row.__source.construct_averages[construct.id],
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Desktop data grid */}
+          <div className="hidden overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white md:block">
+            <DataGrid
+              columns={gridColumns}
+              rows={dataGridRows}
+              rowKeyGetter={(row) => row.id}
+              onCellClick={handleCellClick}
+              defaultColumnOptions={{ resizable: true, sortable: true }}
+              sortColumns={sheetSortColumns}
+              onSortColumnsChange={setSheetSortColumns}
+              rowHeight={44}
+              headerRowHeight={44}
+              className="rdg-light border-0 text-sm"
+              style={{ blockSize: "34rem" }}
+            />
+          </div>
+        </div>
       </div>
 
+      {/* Construct / text detail modal */}
       {detailState ? (
         <div className="modal-backdrop">
-          <div className="w-full max-w-2xl space-y-6 rounded-[2rem] border border-slate-200 bg-white p-7 shadow-[0_36px_120px_-50px_rgba(15,23,42,0.5)]">
+          <div className="w-full max-w-2xl space-y-6 rounded-[2rem] border border-slate-200 bg-white p-7 shadow-[0_36px_120px_-50px_rgba(15,23,42,0.5)] sm:p-8">
             <div className="flex items-start justify-between gap-4">
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <span className="eyebrow">
                   {detailState.kind === "construct"
                     ? "Construct Detail"
-                    : "Feedback Detail"}
+                    : "Response Detail"}
                 </span>
-                <h3 className="text-2xl font-semibold tracking-tight text-slate-950">
+                <h3 className="text-xl font-semibold tracking-tight text-slate-950">
                   {detailState.kind === "construct"
                     ? detailState.construct.label
                     : detailState.title}
                 </h3>
-                <p className="text-sm text-slate-600">
+                <p className="text-xs text-slate-500">
                   Participant:{" "}
-                  <span className="font-mono text-slate-900">
+                  <span className="font-mono text-slate-800">
                     {detailState.participantId}
                   </span>
                 </p>
               </div>
               <button
                 type="button"
-                className="secondary-button px-4 py-2 text-xs"
+                className="secondary-button shrink-0 px-4 py-2 text-xs"
                 onClick={() => setDetailState(null)}
               >
                 Close
@@ -1541,21 +1844,21 @@ export function AdminStatsDashboard({
             </div>
 
             {detailState.kind === "construct" ? (
-              <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50">
-                <div className="grid grid-cols-[minmax(0,1fr)_8rem] border-b border-slate-200 px-5 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                  <div>Item</div>
+              <div className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-slate-50">
+                <div className="grid grid-cols-[1fr_7rem] border-b border-slate-200 px-5 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  <div>Item key</div>
                   <div className="text-right">Value</div>
                 </div>
                 <div className="divide-y divide-slate-200">
                   {detailState.values.map((item) => (
                     <div
                       key={item.key}
-                      className="grid grid-cols-[minmax(0,1fr)_8rem] px-5 py-3 text-sm text-slate-800"
+                      className="grid grid-cols-[1fr_7rem] px-5 py-3"
                     >
                       <div className="font-mono text-xs text-slate-700">
                         {item.sourceKey}
                       </div>
-                      <div className="text-right font-semibold text-slate-950">
+                      <div className="text-right text-sm font-semibold text-slate-950">
                         {formatCellValue(item.value)}
                       </div>
                     </div>
