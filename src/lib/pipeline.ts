@@ -978,7 +978,7 @@ function buildPostMeasureQuestionSections(iv1: "A" | "B") {
 }
 
 export const PIPELINE: PipelineConfig = {
-  code: "pilot_0515",
+  code: "official_v1",
   assign: {
     iv1: { mode: "balanced", values: ["A", "B"] },
     iv2: { mode: "balanced", values: ["A", "B"] },
@@ -1123,7 +1123,7 @@ export const PIPELINE: PipelineConfig = {
           transitionModal: {
             title: "Next step",
             description:
-              "You will now be taken to the actual AI Workplace Assistant, where you will view the conversation and interact with it as the employee in the video, starting from the point where the demo video ended.",
+              "You will now be taken to the actual AI Workplace Assistant, where you will view the conversation and interact with it as the employee in the video, starting from the point where the demo video ended.<br><strong class='text-underline'>Please be sure to read any additional message from the AI carefully, as it will be relevant later</strong>",
             confirmLabel: "Continue",
             confirmDelaySeconds: STAGE_WAIT_SECONDS.stage5TransitionConfirm,
           },

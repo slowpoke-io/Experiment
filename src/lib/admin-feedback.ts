@@ -149,27 +149,29 @@ export async function fetchAdminFeedback(): Promise<AdminFeedbackResponse> {
         FEEDBACK_CONTENT_KEYS,
       );
 
-      if (!stage6Row || !feedbackContent) {
-        return null;
-      }
-
       const feedbackReason = getFirstNonEmptyString(
         getResponses(stage7Row?.answers),
         FEEDBACK_REASON_KEYS,
       );
 
+      if (!feedbackContent && !feedbackReason) {
+        return null;
+      }
+
       return {
         ...overviewRow,
         feedback_content: feedbackContent,
         feedback_reason: feedbackReason,
-        feedback_submitted_at: stage6Row.created_at,
+        feedback_submitted_at: stage6Row?.created_at ?? null,
         reason_submitted_at: stage7Row?.created_at ?? null,
       };
     })
     .filter((row): row is AdminFeedbackRow => row !== null)
-    .sort((left, right) =>
-      right.feedback_submitted_at.localeCompare(left.feedback_submitted_at),
-    );
+    .sort((left, right) => {
+      const leftTime = left.feedback_submitted_at ?? left.reason_submitted_at ?? "";
+      const rightTime = right.feedback_submitted_at ?? right.reason_submitted_at ?? "";
+      return rightTime.localeCompare(leftTime);
+    });
 
   return {
     ok: true,

@@ -470,9 +470,9 @@ export type AdminFeedbackRow = {
   started_at: string;
   updated_at: string;
   total_seconds: number | null;
-  feedback_content: string;
+  feedback_content: string | null;
   feedback_reason: string | null;
-  feedback_submitted_at: string;
+  feedback_submitted_at: string | null;
   reason_submitted_at: string | null;
 };
 
