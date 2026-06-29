@@ -469,6 +469,9 @@ export function AdminFeedbackPage({ initialData, onLogout }: AdminFeedbackPagePr
               <Link href="/admin/stats" className="secondary-button">
                 Statistics
               </Link>
+              <Link href="/admin/coding" className="secondary-button">
+                Coding
+              </Link>
               <button
                 type="button"
                 className="secondary-button"

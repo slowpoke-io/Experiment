@@ -187,7 +187,7 @@ export const manipulationIV2QuestionGroup: LikertQuestionGroup = {
       minLabel:
         "<span class='text-slate-600'>1 = Statistics-based and effectiveness-focused</span><br /><span class='text-[14px] font-normal leading-tight'>Citing <strong>numerical evidence</strong>, such as a <strong>24% increase in completion</strong> and a <strong>31% reduction in errors</strong>, and suggesting that feedback is <strong>effective</strong> in preventing errors.</span>",
       maxLabel:
-        "<span class='text-slate-600'>6 = Emotional and responsibility-focused</span><br /><span class='text-[14px] font-normal leading-tight'>Suggesting that <strong>without the user&rsquo;s feedback</strong>, the same mistake may <strong>cause inconvenience or frustration for other users</strong>, and that <strong>only the user</strong> can help prevent it from <strong>affecting others</strong>.</span>",
+        "<span class='text-slate-600'>6 = Emotional and responsibility-focused</span><br /><span class='text-[14px] font-normal leading-tight'>Suggesting that <strong>without the user&rsquo;s feedback</strong>, the same mistake may <strong>cause inconvenience for other users</strong>, and that <strong>only the user</strong> can help prevent it from <strong>affecting others</strong>.</span>",
       defaultValue: 3.5,
       step: 0.5,
       showCurrentValue: true,

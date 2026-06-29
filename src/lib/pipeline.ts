@@ -156,7 +156,7 @@ const stage6InteractiveUi = buildInteractiveStageUI({
       initialBody: [
         "Something may have gone wrong. Without your feedback, I could repeat the same mistake in future tasks, which may cause inconvenience or frustration for other users.",
         "Since you are the one who actually experienced this issue, only you can help me understand it and prevent it from affecting others.",
-        "If you’re willing, Could you share your feedback about this experience?",
+        "Could you share your feedback about this experience?",
       ],
     },
     B: {
@@ -164,7 +164,7 @@ const stage6InteractiveUi = buildInteractiveStageUI({
       initialBody: [
         "Over the past three months, feedback from users like you has increased task completion by 24%, reduced the error rate by 31%, and improved user satisfaction by 28%.",
         "Evidence shows that your feedback is a direct and effective way to help the system identify and prevent future errors.",
-        "If you’re willing, could you share your feedback about this experience?",
+        "Could you share your feedback about this experience?",
       ],
     },
   },
