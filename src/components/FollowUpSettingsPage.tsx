@@ -21,6 +21,9 @@ function buildPreviewUrl(code: string) {
   return `https://app.prolific.com/submissions/complete?cc=${encodeURIComponent(code.trim())}`;
 }
 
+const FOLLOW_UP_STUDY_PREVIEW_URL =
+  "https://ai-workplace-assistant.nblab.im.ntu.edu.tw/?prolific_id={{%PROLIFIC_PID%}}";
+
 export function FollowUpSettingsPage({
   initialSettings,
 }: FollowUpSettingsPageProps) {
@@ -266,6 +269,10 @@ export function FollowUpSettingsPage({
           </div>
 
           <div className="mt-6 space-y-4">
+            <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4">
+              <div className="hero-metric-label">Study URL</div>
+              <div className="hero-metric-value">{FOLLOW_UP_STUDY_PREVIEW_URL}</div>
+            </div>
             <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4">
               <div className="hero-metric-label">Pipeline</div>
               <div className="hero-metric-value">{pipelineCode}</div>

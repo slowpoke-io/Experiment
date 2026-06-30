@@ -172,7 +172,62 @@ export type FollowUpResultsPayload = {
 type ExportColumn =
   | { kind: "meta"; header: string; value: (row: AdminStatsParticipantRow) => unknown }
   | { kind: "response"; header: string; key: string }
-  | { kind: "average"; header: string; constructId: string };
+  | { kind: "average"; header: string; constructId: string }
+  | { kind: "computed"; header: string; value: (row: AdminStatsParticipantRow) => unknown };
+
+const EXPORT_ALIAS_RESPONSE_KEYS: Record<string, string> = {
+  PRE_COGNITIVE_TRUST_1: "pre_questionnaire.PRE_ABILITY_1",
+  PRE_COGNITIVE_TRUST_2: "pre_questionnaire.PRE_ABILITY_2",
+  PRE_COGNITIVE_TRUST_3: "pre_questionnaire.PRE_ABILITY_3",
+  PRE_COGNITIVE_TRUST_4: "pre_questionnaire.PRE_ABILITY_4",
+  POST_COGNITIVE_TRUST_1: "post_questionnaire.POST_ABILITY_1",
+  POST_COGNITIVE_TRUST_2: "post_questionnaire.POST_ABILITY_2",
+  POST_COGNITIVE_TRUST_3: "post_questionnaire.POST_ABILITY_3",
+  POST_COGNITIVE_TRUST_4: "post_questionnaire.POST_ABILITY_4",
+  PRE_AFFECTIVE_TRUST_1: "pre_questionnaire.PRE_BENEVOLENCE_1",
+  PRE_AFFECTIVE_TRUST_4: "pre_questionnaire.PRE_INTEGRITY_1",
+  PRE_AFFECTIVE_TRUST_2: "pre_questionnaire.PRE_BENEVOLENCE_2",
+  PRE_AFFECTIVE_TRUST_5: "pre_questionnaire.PRE_INTEGRITY_2",
+  PRE_AFFECTIVE_TRUST_3: "pre_questionnaire.PRE_BENEVOLENCE_3",
+  PRE_AFFECTIVE_TRUST_6: "pre_questionnaire.PRE_INTEGRITY_3",
+  POST_AFFECTIVE_TRUST_1: "post_questionnaire.POST_BENEVOLENCE_1",
+  POST_AFFECTIVE_TRUST_4: "post_questionnaire.POST_INTEGRITY_1",
+  POST_AFFECTIVE_TRUST_2: "post_questionnaire.POST_BENEVOLENCE_2",
+  POST_AFFECTIVE_TRUST_5: "post_questionnaire.POST_INTEGRITY_2",
+  POST_AFFECTIVE_TRUST_3: "post_questionnaire.POST_BENEVOLENCE_3",
+  POST_AFFECTIVE_TRUST_6: "post_questionnaire.POST_INTEGRITY_3",
+};
+
+const EXPORT_ALIAS_AVERAGE_KEYS: Record<string, string[]> = {
+  AVG_PRE_COGNITIVE_TRUST: [
+    "pre_questionnaire.PRE_ABILITY_1",
+    "pre_questionnaire.PRE_ABILITY_2",
+    "pre_questionnaire.PRE_ABILITY_3",
+    "pre_questionnaire.PRE_ABILITY_4",
+  ],
+  AVG_POST_COGNITIVE_TRUST: [
+    "post_questionnaire.POST_ABILITY_1",
+    "post_questionnaire.POST_ABILITY_2",
+    "post_questionnaire.POST_ABILITY_3",
+    "post_questionnaire.POST_ABILITY_4",
+  ],
+  AVG_PRE_AFFECTIVE_TRUST: [
+    "pre_questionnaire.PRE_BENEVOLENCE_1",
+    "pre_questionnaire.PRE_BENEVOLENCE_2",
+    "pre_questionnaire.PRE_BENEVOLENCE_3",
+    "pre_questionnaire.PRE_INTEGRITY_1",
+    "pre_questionnaire.PRE_INTEGRITY_2",
+    "pre_questionnaire.PRE_INTEGRITY_3",
+  ],
+  AVG_POST_AFFECTIVE_TRUST: [
+    "post_questionnaire.POST_BENEVOLENCE_1",
+    "post_questionnaire.POST_BENEVOLENCE_2",
+    "post_questionnaire.POST_BENEVOLENCE_3",
+    "post_questionnaire.POST_INTEGRITY_1",
+    "post_questionnaire.POST_INTEGRITY_2",
+    "post_questionnaire.POST_INTEGRITY_3",
+  ],
+};
 
 function isExportableResponseColumn(column: AdminResponseColumn) {
   return !EXCLUDED_SOURCE_KEYS.has(column.sourceKey);
@@ -216,6 +271,21 @@ function escapeCsvCell(value: unknown) {
     return `"${formatted.replace(/"/g, '""')}"`;
   }
   return formatted;
+}
+
+function buildAliasAverageValue(
+  row: AdminStatsParticipantRow,
+  sourceKeys: string[],
+) {
+  const numericValues = sourceKeys
+    .map((key) => row.response_values[key])
+    .filter((value): value is number => typeof value === "number");
+
+  if (numericValues.length === 0) {
+    return null;
+  }
+
+  return numericValues.reduce((sum, value) => sum + value, 0) / numericValues.length;
 }
 
 function formatFailureReason(value: unknown) {
@@ -279,8 +349,8 @@ function buildResultsRows(stats: AdminStatisticsResponse): FollowUpResultRow[] {
         ? String(row.response_values["stage_6.FEEDBACK_CONTENT"])
         : "";
     const feedbackReason =
-      typeof row.response_values["stage_7.FEEDBACK_REASON"] === "string"
-        ? String(row.response_values["stage_7.FEEDBACK_REASON"])
+      typeof row.response_values["post_questionnaire.FEEDBACK_REASON"] === "string"
+        ? String(row.response_values["post_questionnaire.FEEDBACK_REASON"])
         : "";
 
     return {
@@ -446,6 +516,26 @@ function buildExportColumns(stats: AdminStatisticsResponse): ExportColumn[] {
       continue;
     }
 
+    const aliasAverageKeys = EXPORT_ALIAS_AVERAGE_KEYS[header];
+    if (aliasAverageKeys) {
+      exportColumns.push({
+        kind: "computed",
+        header,
+        value: (row) => buildAliasAverageValue(row, aliasAverageKeys),
+      });
+      continue;
+    }
+
+    const aliasResponseKey = EXPORT_ALIAS_RESPONSE_KEYS[header];
+    if (aliasResponseKey) {
+      exportColumns.push({
+        kind: "computed",
+        header,
+        value: (row) => row.response_values[aliasResponseKey] ?? null,
+      });
+      continue;
+    }
+
     const responseColumn = responseColumnBySourceKey.get(header);
     if (!responseColumn || !isExportableResponseColumn(responseColumn)) {
       continue;
@@ -532,6 +622,10 @@ export function buildFollowUpExportCsv(
 
         if (column.kind === "average") {
           return escapeCsvCell(row.construct_averages[column.constructId] ?? null);
+        }
+
+        if (column.kind === "computed") {
+          return escapeCsvCell(column.value(row));
         }
 
         return escapeCsvCell(row.response_values[column.key]);

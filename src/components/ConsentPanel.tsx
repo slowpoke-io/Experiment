@@ -171,7 +171,7 @@ export function ConsentPanel({ prolificId, sharedQuery }: ConsentPanelProps) {
                   <span>
                     The study is completed in less than{" "}
                     <strong>5 minutes</strong> or more than{" "}
-                    <strong>30 minutes</strong>.
+                    <strong>45 minutes</strong>.
                   </span>
                 </li>
                 <li className="flex gap-2">

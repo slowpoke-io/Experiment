@@ -117,7 +117,7 @@ export async function fetchAdminFeedback(): Promise<AdminFeedbackResponse> {
       .from("submissions")
       .select("prolific_id, created_at, answers")
       .eq("pipeline_code", PIPELINE.code)
-      .eq("stage_id", "stage_7")
+      .eq("stage_id", "post_questionnaire")
       .order("created_at", { ascending: false }),
   ]);
 
