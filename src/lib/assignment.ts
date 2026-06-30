@@ -146,7 +146,7 @@ async function pickBalancedIvPair(
   return { iv1, iv2 };
 }
 
-export async function cleanupAbandoned(pipelineCode: string = PIPELINE.code) {
+export async function cleanupAbandoned() {
   const supabase = getSupabaseAdmin();
   const cutoff = new Date(
     Date.now() - ABANDON_TIMEOUT_MINUTES * 60 * 1000,
@@ -155,7 +155,6 @@ export async function cleanupAbandoned(pipelineCode: string = PIPELINE.code) {
   const { data, error } = await supabase
     .from("progress")
     .select("pipeline_code, prolific_id, started_at")
-    .eq("pipeline_code", pipelineCode)
     .eq("completed", false)
     .eq("failed", false)
     .lt("updated_at", cutoff);

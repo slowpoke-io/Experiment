@@ -73,7 +73,7 @@ export async function initHandler(
 
     const supabase = deps.getSupabaseAdmin();
     const settings = await deps.getProlificSettings(supabase);
-    await deps.cleanupAbandoned(settings.pipelineCode);
+    await deps.cleanupAbandoned();
     const loadProgress = async () => {
       const progressResult = await supabase
         .from("progress")

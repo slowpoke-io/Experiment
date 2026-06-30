@@ -2,6 +2,10 @@
 
 這是一個用 `Next.js Pages Router` 實作的實驗網站。受試者從 Prolific 進站後，會先閱讀 informed consent，再依照固定的 7 個 stage 完成前測、情境閱讀、影片、互動、後測。前後端都在同一個 repo，資料由 server-side Supabase service role 寫入。
 
+正式站點：
+
+- [ai-workplace-assistant.nblab.im.ntu.edu.tw](https://ai-workplace-assistant.nblab.im.ntu.edu.tw/)
+
 目前的 pipeline code 是 `study_v1`，核心操弄是 `iv1` 與 `iv2` 兩個二元變項，兩者都用 balanced assignment 指派：
 
 - `iv1`: 控制 `stage_4` 的 `System Notice` 文案。

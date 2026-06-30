@@ -1048,7 +1048,7 @@ export const PIPELINE: PipelineConfig = {
       },
     },
     {
-      id: "stage_4",
+      id: "system-notice",
       active: true,
       variant: {
         mode: "random",
@@ -1079,7 +1079,7 @@ export const PIPELINE: PipelineConfig = {
       params: {},
     },
     {
-      id: "stage_5",
+      id: "video",
       active: true,
       variant: {
         mode: "random",
@@ -1118,7 +1118,7 @@ export const PIPELINE: PipelineConfig = {
       params: {},
     },
     {
-      id: "stage_6",
+      id: "popup",
       active: true,
       variant: {
         mode: "random",
