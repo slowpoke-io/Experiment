@@ -2,11 +2,10 @@ import type { NextApiRequest, NextApiResponse } from "next";
 
 import {
   PIPELINE,
-  PROLIFIC_COMPLETE_URL,
-  PROLIFIC_FAIL_URL,
   buildStageResponse,
   participantStageAt,
 } from "@/lib/pipeline";
+import { getProlificSettings } from "@/lib/prolific-settings";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import type {
   ApiErrorResponse,
@@ -16,20 +15,18 @@ import type {
 
 export type CurrentStageHandlerDeps = {
   getSupabaseAdmin: typeof getSupabaseAdmin;
+  getProlificSettings: typeof getProlificSettings;
   participantStageAt: typeof participantStageAt;
   buildStageResponse: typeof buildStageResponse;
   PIPELINE: typeof PIPELINE;
-  PROLIFIC_COMPLETE_URL: string;
-  PROLIFIC_FAIL_URL: string;
 };
 
 const defaultDeps: CurrentStageHandlerDeps = {
   getSupabaseAdmin,
+  getProlificSettings,
   participantStageAt,
   buildStageResponse,
   PIPELINE,
-  PROLIFIC_COMPLETE_URL,
-  PROLIFIC_FAIL_URL,
 };
 
 function getQueryValue(value: string | string[] | undefined) {
@@ -56,10 +53,11 @@ export async function currentStageHandler(
     }
 
     const supabase = deps.getSupabaseAdmin();
+    const settings = await deps.getProlificSettings(supabase);
     const { data, error } = await supabase
       .from("progress")
       .select("*")
-      .eq("pipeline_code", deps.PIPELINE.code)
+      .eq("pipeline_code", settings.pipelineCode)
       .eq("prolific_id", prolificId)
       .single();
 
@@ -74,7 +72,7 @@ export async function currentStageHandler(
         ok: true,
         prolificId,
         completed: true,
-        redirectUrl: deps.PROLIFIC_COMPLETE_URL,
+        redirectUrl: settings.completeUrl,
       });
     }
 
@@ -85,7 +83,7 @@ export async function currentStageHandler(
         failed: true,
         failed_stage_id: progress.failed_stage_id,
         failed_reason: progress.failed_reason,
-        redirectUrl: deps.PROLIFIC_FAIL_URL,
+        redirectUrl: settings.failUrl,
       });
     }
 
@@ -95,7 +93,7 @@ export async function currentStageHandler(
         ok: true,
         prolificId,
         completed: true,
-        redirectUrl: deps.PROLIFIC_COMPLETE_URL,
+        redirectUrl: settings.completeUrl,
       });
     }
 

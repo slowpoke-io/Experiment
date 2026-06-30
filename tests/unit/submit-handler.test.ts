@@ -45,6 +45,14 @@ const baseProgress = {
   updated_at: "2026-05-02T00:00:00.000Z",
 };
 
+const prolificSettings = {
+  pipelineCode: "study_v1",
+  studyOpen: true,
+  completeUrl: "https://complete.test",
+  failUrl: "https://fail.test",
+  noconsentUrl: "https://noconsent.test",
+};
+
 function buildDeps(options: {
   supabase: ReturnType<typeof createSupabaseMock>;
   validatorResult?: { passed: boolean; verdict: Record<string, unknown> };
@@ -53,6 +61,7 @@ function buildDeps(options: {
 }) {
   return {
     getSupabaseAdmin: () => options.supabase.client as never,
+    getProlificSettings: async () => prolificSettings,
     VALIDATORS: {
       test_validator: () =>
         options.validatorResult ?? {
@@ -66,8 +75,6 @@ function buildDeps(options: {
       (options.stage === undefined ? currentStage : options.stage) as never,
     nowIso: () => "2026-05-02T00:10:00.000Z",
     PIPELINE: { code: "study_v1" } as never,
-    PROLIFIC_COMPLETE_URL: "https://complete.test",
-    PROLIFIC_FAIL_URL: "https://fail.test",
   };
 }
 

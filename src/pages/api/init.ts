@@ -8,12 +8,11 @@ import {
 import { formatApiError, isUniqueViolation } from "@/lib/api-errors";
 import {
   PIPELINE,
-  PROLIFIC_COMPLETE_URL,
-  PROLIFIC_FAIL_URL,
   buildStageResponse,
   participantStageAt,
   nowIso,
 } from "@/lib/pipeline";
+import { getProlificSettings } from "@/lib/prolific-settings";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import type {
   ApiErrorResponse,
@@ -25,6 +24,7 @@ import type {
 export type InitHandlerDeps = {
   cleanupAbandoned: typeof cleanupAbandoned;
   getSupabaseAdmin: typeof getSupabaseAdmin;
+  getProlificSettings: typeof getProlificSettings;
   assignIV: typeof assignIV;
   resolveAllVariants: typeof resolveAllVariants;
   participantStageAt: typeof participantStageAt;
@@ -33,13 +33,12 @@ export type InitHandlerDeps = {
   formatApiError: typeof formatApiError;
   isUniqueViolation: typeof isUniqueViolation;
   PIPELINE: typeof PIPELINE;
-  PROLIFIC_COMPLETE_URL: string;
-  PROLIFIC_FAIL_URL: string;
 };
 
 const defaultDeps: InitHandlerDeps = {
   cleanupAbandoned,
   getSupabaseAdmin,
+  getProlificSettings,
   assignIV,
   resolveAllVariants,
   participantStageAt,
@@ -48,8 +47,6 @@ const defaultDeps: InitHandlerDeps = {
   formatApiError,
   isUniqueViolation,
   PIPELINE,
-  PROLIFIC_COMPLETE_URL,
-  PROLIFIC_FAIL_URL,
 };
 
 export async function initHandler(
@@ -63,8 +60,6 @@ export async function initHandler(
   }
 
   try {
-    await deps.cleanupAbandoned();
-
     const prolificId =
       typeof (req.body as InitRequestBody | undefined)?.prolificId === "string"
         ? (req.body as InitRequestBody).prolificId.trim()
@@ -77,11 +72,13 @@ export async function initHandler(
     }
 
     const supabase = deps.getSupabaseAdmin();
+    const settings = await deps.getProlificSettings(supabase);
+    await deps.cleanupAbandoned(settings.pipelineCode);
     const loadProgress = async () => {
       const progressResult = await supabase
         .from("progress")
         .select("*")
-        .eq("pipeline_code", deps.PIPELINE.code)
+        .eq("pipeline_code", settings.pipelineCode)
         .eq("prolific_id", prolificId)
         .maybeSingle();
 
@@ -92,22 +89,26 @@ export async function initHandler(
       return progressResult.data;
     };
 
-    const participantResult = await supabase
-      .from("participants")
-      .upsert({ prolific_id: prolificId });
-
-    if (participantResult.error) {
-      throw participantResult.error;
-    }
-
     let progress = await loadProgress();
 
     if (!progress) {
+      if (!settings.studyOpen) {
+        return res.status(403).json({ ok: false, message: "study is closed" });
+      }
+
+      const participantResult = await supabase
+        .from("participants")
+        .upsert({ prolific_id: prolificId });
+
+      if (participantResult.error) {
+        throw participantResult.error;
+      }
+
       let iv1: string;
       let iv2: string;
 
       try {
-        ({ iv1, iv2 } = await deps.assignIV(req.query));
+        ({ iv1, iv2 } = await deps.assignIV(req.query, settings.pipelineCode));
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Invalid IV override";
@@ -122,7 +123,7 @@ export async function initHandler(
       const createdAt = deps.nowIso();
 
       const insertResult = await supabase.from("progress").insert({
-        pipeline_code: deps.PIPELINE.code,
+        pipeline_code: settings.pipelineCode,
         prolific_id: prolificId,
         iv1,
         iv2,
@@ -150,7 +151,7 @@ export async function initHandler(
         ok: true,
         prolificId,
         completed: true,
-        redirectUrl: deps.PROLIFIC_COMPLETE_URL,
+        redirectUrl: settings.completeUrl,
       });
     }
 
@@ -161,7 +162,7 @@ export async function initHandler(
         failed: true,
         failed_stage_id: typedProgress.failed_stage_id,
         failed_reason: typedProgress.failed_reason,
-        redirectUrl: deps.PROLIFIC_FAIL_URL,
+        redirectUrl: settings.failUrl,
       });
     }
 
@@ -170,6 +171,7 @@ export async function initHandler(
       typedProgress.stage_variants ?? {},
       req.query,
       typedProgress,
+      settings.pipelineCode,
     );
 
     typedProgress.stage_variants = stageVariants;
@@ -182,7 +184,7 @@ export async function initHandler(
       const updateResult = await supabase
         .from("progress")
         .update({ completed: true, updated_at: deps.nowIso() })
-        .eq("pipeline_code", deps.PIPELINE.code)
+        .eq("pipeline_code", settings.pipelineCode)
         .eq("prolific_id", prolificId);
 
       if (updateResult.error) {
@@ -193,7 +195,7 @@ export async function initHandler(
         ok: true,
         prolificId,
         completed: true,
-        redirectUrl: deps.PROLIFIC_COMPLETE_URL,
+        redirectUrl: settings.completeUrl,
       });
     }
 

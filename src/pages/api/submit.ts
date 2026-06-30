@@ -2,12 +2,11 @@ import type { NextApiRequest, NextApiResponse } from "next";
 
 import {
   PIPELINE,
-  PROLIFIC_COMPLETE_URL,
-  PROLIFIC_FAIL_URL,
   getParticipantStages,
   nowIso,
   participantStageAt,
 } from "@/lib/pipeline";
+import { getProlificSettings } from "@/lib/prolific-settings";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import type {
   ApiErrorResponse,
@@ -20,24 +19,22 @@ import { VALIDATORS } from "@/lib/validators";
 
 export type SubmitHandlerDeps = {
   getSupabaseAdmin: typeof getSupabaseAdmin;
+  getProlificSettings: typeof getProlificSettings;
   VALIDATORS: typeof VALIDATORS;
   getParticipantStages: typeof getParticipantStages;
   participantStageAt: typeof participantStageAt;
   nowIso: typeof nowIso;
   PIPELINE: typeof PIPELINE;
-  PROLIFIC_COMPLETE_URL: string;
-  PROLIFIC_FAIL_URL: string;
 };
 
 const defaultDeps: SubmitHandlerDeps = {
   getSupabaseAdmin,
+  getProlificSettings,
   VALIDATORS,
   getParticipantStages,
   participantStageAt,
   nowIso,
   PIPELINE,
-  PROLIFIC_COMPLETE_URL,
-  PROLIFIC_FAIL_URL,
 };
 
 const ABANDON_TIMEOUT_SECONDS = 50 * 60;
@@ -71,10 +68,11 @@ export async function submitHandler(
     }
 
     const supabase = deps.getSupabaseAdmin();
+    const settings = await deps.getProlificSettings(supabase);
     const progressResult = await supabase
       .from("progress")
       .select("*")
-      .eq("pipeline_code", deps.PIPELINE.code)
+      .eq("pipeline_code", settings.pipelineCode)
       .eq("prolific_id", prolificId)
       .single();
 
@@ -95,7 +93,7 @@ export async function submitHandler(
         completed: false,
         lockedOut: true,
         nextStageId: null,
-        redirectUrl: deps.PROLIFIC_FAIL_URL,
+        redirectUrl: settings.failUrl,
         verdict: progress.failed_reason ?? { reason: "locked_out" },
       });
     }
@@ -113,7 +111,7 @@ export async function submitHandler(
     const duplicateResult = await supabase
       .from("submissions")
       .select("id")
-      .eq("pipeline_code", deps.PIPELINE.code)
+      .eq("pipeline_code", settings.pipelineCode)
       .eq("stage_id", stageId)
       .eq("prolific_id", prolificId)
       .maybeSingle();
@@ -171,7 +169,7 @@ export async function submitHandler(
       totalSeconds !== null && totalSeconds > ABANDON_TIMEOUT_SECONDS;
 
     const insertResult = await supabase.from("submissions").insert({
-      pipeline_code: deps.PIPELINE.code,
+      pipeline_code: settings.pipelineCode,
       stage_id: stageId,
       variant_id: variantId,
       prolific_id: prolificId,
@@ -200,7 +198,7 @@ export async function submitHandler(
           ...(totalSeconds !== null ? { total_seconds: totalSeconds } : {}),
           updated_at: deps.nowIso(),
         })
-        .eq("pipeline_code", deps.PIPELINE.code)
+        .eq("pipeline_code", settings.pipelineCode)
         .eq("prolific_id", prolificId);
 
       if (updateResult.error) {
@@ -213,7 +211,7 @@ export async function submitHandler(
         completed: false,
         lockedOut: true,
         nextStageId: null,
-        redirectUrl: deps.PROLIFIC_FAIL_URL,
+        redirectUrl: settings.failUrl,
         verdict: timeoutVerdict,
       });
     }
@@ -228,7 +226,7 @@ export async function submitHandler(
           ...(totalSeconds !== null ? { total_seconds: totalSeconds } : {}),
           updated_at: deps.nowIso(),
         })
-        .eq("pipeline_code", deps.PIPELINE.code)
+        .eq("pipeline_code", settings.pipelineCode)
         .eq("prolific_id", prolificId);
 
       if (updateResult.error) {
@@ -241,7 +239,7 @@ export async function submitHandler(
         completed: false,
         lockedOut: true,
         nextStageId: null,
-        redirectUrl: deps.PROLIFIC_FAIL_URL,
+        redirectUrl: settings.failUrl,
         verdict,
       });
     }
@@ -260,7 +258,7 @@ export async function submitHandler(
     const updateResult = await supabase
       .from("progress")
       .update(updatePayload)
-      .eq("pipeline_code", deps.PIPELINE.code)
+      .eq("pipeline_code", settings.pipelineCode)
       .eq("prolific_id", prolificId);
 
     if (updateResult.error) {
@@ -272,7 +270,7 @@ export async function submitHandler(
       passed: true,
       completed,
       nextStageId: completed ? null : participantStages[nextIndex].id,
-      redirectUrl: completed ? deps.PROLIFIC_COMPLETE_URL : null,
+      redirectUrl: completed ? settings.completeUrl : null,
       verdict,
     });
   } catch (error) {

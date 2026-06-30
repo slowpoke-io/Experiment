@@ -27,6 +27,14 @@ const activeProgress = {
   updated_at: "2026-05-02T00:00:00.000Z",
 };
 
+const prolificSettings = {
+  pipelineCode: "study_v1",
+  studyOpen: true,
+  completeUrl: "https://complete.test",
+  failUrl: "https://fail.test",
+  noconsentUrl: "https://noconsent.test",
+};
+
 describe("initHandler", () => {
   it("creates a new participant and returns the first stage", async () => {
     let progressLookupCount = 0;
@@ -63,6 +71,7 @@ describe("initHandler", () => {
     await initHandler(req as never, res as never, {
       cleanupAbandoned: async () => {},
       getSupabaseAdmin: () => supabase.client as never,
+      getProlificSettings: async () => prolificSettings,
       assignIV: async () => ({ iv1: "A", iv2: "B" }),
       resolveAllVariants: async () => ({ stage_1: "default" }),
       participantStageAt: () => sampleStage as never,
@@ -76,8 +85,6 @@ describe("initHandler", () => {
       formatApiError: () => "unexpected",
       isUniqueViolation: () => false,
       PIPELINE: { code: "study_v1" } as never,
-      PROLIFIC_COMPLETE_URL: "https://complete.test",
-      PROLIFIC_FAIL_URL: "https://fail.test",
     });
 
     expect(res.statusCode).toBe(200);
@@ -105,6 +112,55 @@ describe("initHandler", () => {
       updated_at: "2026-05-02T00:00:00.000Z",
     });
   });
+
+  it("rejects new participants when the study is closed", async () => {
+    const supabase = createSupabaseMock((state) => {
+      if (
+        state.table === "progress" &&
+        state.action === "select" &&
+        state.expect === "maybeSingle"
+      ) {
+        return { data: null };
+      }
+
+      throw new Error(`Unexpected query: ${state.table}/${state.action}`);
+    });
+
+    const req = createMockReq({
+      method: "POST",
+      body: { prolificId: "p1" },
+      query: {},
+    });
+    const res = createMockRes();
+
+    await initHandler(req as never, res as never, {
+      cleanupAbandoned: async () => {},
+      getSupabaseAdmin: () => supabase.client as never,
+      getProlificSettings: async () => ({
+        ...prolificSettings,
+        studyOpen: false,
+      }),
+      assignIV: async () => ({ iv1: "A", iv2: "B" }),
+      resolveAllVariants: async () => ({ stage_1: "default" }),
+      participantStageAt: () => sampleStage as never,
+      buildStageResponse: (progress, stage, variantId) => ({
+        ok: true,
+        pipeline: progress.pipeline_code,
+        stageId: stage.id,
+        variantId,
+      }),
+      nowIso: () => "2026-05-02T00:00:00.000Z",
+      formatApiError: () => "unexpected",
+      isUniqueViolation: () => false,
+      PIPELINE: { code: "study_v1" } as never,
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.body).toEqual({
+      ok: false,
+      message: "study is closed",
+    });
+  });
 });
 
 describe("currentStageHandler", () => {
@@ -129,6 +185,7 @@ describe("currentStageHandler", () => {
 
     await currentStageHandler(req as never, res as never, {
       getSupabaseAdmin: () => supabase.client as never,
+      getProlificSettings: async () => prolificSettings,
       participantStageAt: () => sampleStage as never,
       buildStageResponse: (progress, stage, variantId) => ({
         ok: true,
@@ -137,8 +194,6 @@ describe("currentStageHandler", () => {
         variantId,
       }),
       PIPELINE: { code: "study_v1" } as never,
-      PROLIFIC_COMPLETE_URL: "https://complete.test",
-      PROLIFIC_FAIL_URL: "https://fail.test",
     });
 
     expect(res.body).toEqual({

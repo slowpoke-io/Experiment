@@ -100,18 +100,6 @@ type ChoiceAttentionCheckConfig = {
 
 export const ABANDON_TIMEOUT_MINUTES = 50;
 
-export const PROLIFIC_COMPLETE_URL =
-  process.env.PROLIFIC_COMPLETE_URL ??
-  "https://app.prolific.com/submissions/complete?cc=COMPLETECODE";
-
-export const PROLIFIC_FAIL_URL =
-  process.env.PROLIFIC_FAIL_URL ??
-  "https://app.prolific.com/submissions/complete?cc=FAILCODE";
-
-export const PROLIFIC_NOCONSENT_URL =
-  process.env.PROLIFIC_NOCONSENT_URL ??
-  "https://app.prolific.com/submissions/complete?cc=NOCONSENT";
-
 const sevenLikertScale: LikertScaleConfig = {
   min: 1,
   max: 7,
@@ -319,8 +307,8 @@ function buildSystemNoticeManipulationQuestionGroup(
         id: "MANIPULATION_IV1",
         text: "The <strong>System Notice</strong> stated that early-use issues <strong><span class='font-bold'>DID NOT</span> mean that the AI assistant was incapable</strong>.",
         options: [
-          { value: "yes", label: "Yes  (The notice explicitly stated this)" },
-          { value: "no", label: "No  (The notice did not mention this)" },
+          { value: "yes", label: "Yes" },
+          { value: "no", label: "No" },
           { value: "dont_recall", label: "I don&rsquo;t recall" },
         ],
       },
@@ -840,23 +828,23 @@ const stage7QuestionSections: LikertQuestionSection[] = [
           ],
         },
         {
-          id: "willingness_to_forgive",
-          title: "Willingness to Forgive",
+          id: "forgiveness",
+          title: "Forgiveness",
           items: [
             {
-              id: "WILLINGNESS_TO_FORGIVE_1",
+              id: "FORGIVENESS_1",
               text: "I am willing to forgive the AI Workplace Assistant for this failure.",
             },
             {
-              id: "WILLINGNESS_TO_FORGIVE_2",
+              id: "FORGIVENESS_2",
               text: "I would probably give the AI Workplace Assistant another chance.",
             },
             {
-              id: "WILLINGNESS_TO_FORGIVE_3",
+              id: "FORGIVENESS_3",
               text: "I would probably use the AI Workplace Assistant again despite this failure experience.",
             },
             {
-              id: "WILLINGNESS_TO_FORGIVE_4",
+              id: "FORGIVENESS_4",
               text: "I would forgive the AI Workplace Assistant and use it again.",
             },
           ],
@@ -978,7 +966,7 @@ function buildPostMeasureQuestionSections(iv1: "A" | "B") {
 }
 
 export const PIPELINE: PipelineConfig = {
-  code: "official_v1",
+  code: "followup",
   assign: {
     iv1: { mode: "balanced", values: ["A", "B"] },
     iv2: { mode: "balanced", values: ["A", "B"] },
@@ -1034,7 +1022,7 @@ export const PIPELINE: PipelineConfig = {
       params: {},
     },
     {
-      id: "stage_3",
+      id: "pre_questionnaire",
       active: true,
       variant: {
         mode: "random",
@@ -1076,15 +1064,13 @@ export const PIPELINE: PipelineConfig = {
           title: "System Notice",
           body: [
             "The AI Workplace Assistant has been newly introduced and may occasionally encounter issues during early use.",
-            "If your request does not go through, you may try again later or contact the AI support team for assistance.",
           ],
         }),
         B: buildErrorNoticeStageUI({
           title: "System Notice",
           body: [
             "The AI Workplace Assistant has been newly introduced and may occasionally encounter issues during early use.",
-            "<strong>However, this should not be taken as evidence that the assistant lacks overall capability.</strong>",
-            "If your request does not go through, you may try again later or contact the AI support team for assistance.",
+            "However, this should not be taken as evidence that the assistant lacks overall capability.",
           ],
           progressiveReveal: true,
           initialVisibleParagraphs: 1,
@@ -1123,7 +1109,7 @@ export const PIPELINE: PipelineConfig = {
           transitionModal: {
             title: "Next step",
             description:
-              "You will now be taken to the actual AI Workplace Assistant, where you will view the conversation and interact with it as the employee in the video, starting from the point where the demo video ended.<br><strong class='text-underline'>Please be sure to read any additional message from the AI carefully, as it will be relevant later</strong>",
+              "You will now be taken to the actual AI Workplace Assistant, where you will view the conversation and interact with it as the employee in the video, starting from the point where the demo video ended.",
             confirmLabel: "Continue",
             confirmDelaySeconds: STAGE_WAIT_SECONDS.stage5TransitionConfirm,
           },
@@ -1152,7 +1138,7 @@ export const PIPELINE: PipelineConfig = {
       params: {},
     },
     {
-      id: "stage_7",
+      id: "post_questionnaire",
       active: true,
       variant: {
         mode: "random",
@@ -1203,7 +1189,7 @@ export const PIPELINE: PipelineConfig = {
       },
     },
     {
-      id: "stage_1",
+      id: "self_construal",
       active: true,
       variant: {
         mode: "random",
@@ -1291,7 +1277,7 @@ export function buildStageResponse(
 
   return {
     ok: true,
-    pipeline: PIPELINE.code,
+    pipeline: progress.pipeline_code,
     prolificId: progress.prolific_id,
     iv1: progress.iv1,
     iv2: progress.iv2,
