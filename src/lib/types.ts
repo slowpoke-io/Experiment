@@ -507,6 +507,7 @@ export type AdminStatsParticipantRow = {
   completed: boolean;
   failed: boolean;
   failed_stage_id: string | null;
+  failed_reason: JsonObject | null;
   current_stage_index: number;
   submission_count: number;
   last_submission_stage_id: string | null;

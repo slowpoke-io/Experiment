@@ -74,6 +74,7 @@ async function pickBalancedValue(
   column: "iv1" | "iv2",
   mode: AssignmentMode,
   values: string[],
+  pipelineCode: string,
 ) {
   if (mode !== "balanced") {
     return randomPick(values);
@@ -83,7 +84,7 @@ async function pickBalancedValue(
   const { data, error } = await supabase
     .from("progress")
     .select(column)
-    .eq("pipeline_code", PIPELINE.code)
+    .eq("pipeline_code", pipelineCode)
     .eq("failed", false);
 
   if (error) {
@@ -102,12 +103,16 @@ async function pickBalancedValue(
   return randomPick(getLeastFrequent(counts));
 }
 
-async function pickBalancedIvPair(iv1Values: string[], iv2Values: string[]) {
+async function pickBalancedIvPair(
+  iv1Values: string[],
+  iv2Values: string[],
+  pipelineCode: string,
+) {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("progress")
     .select("iv1, iv2")
-    .eq("pipeline_code", PIPELINE.code)
+    .eq("pipeline_code", pipelineCode)
     .eq("failed", false);
 
   if (error) {
@@ -150,7 +155,6 @@ export async function cleanupAbandoned() {
   const { data, error } = await supabase
     .from("progress")
     .select("pipeline_code, prolific_id, started_at")
-    .eq("pipeline_code", PIPELINE.code)
     .eq("completed", false)
     .eq("failed", false)
     .lt("updated_at", cutoff);
@@ -192,12 +196,13 @@ export async function balancedPick(
   stageId: string,
   variants: string[],
   stratifyBy: StratifyBy = null,
+  pipelineCode: string = PIPELINE.code,
 ) {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("progress")
     .select("stage_variants, iv1, iv2")
-    .eq("pipeline_code", PIPELINE.code)
+    .eq("pipeline_code", pipelineCode)
     .eq("failed", false);
 
   if (error) {
@@ -227,7 +232,10 @@ export async function balancedPick(
   return randomPick(getLeastFrequent(counts));
 }
 
-export async function assignIV(query: Record<string, QueryValue> = {}) {
+export async function assignIV(
+  query: Record<string, QueryValue> = {},
+  pipelineCode: string = PIPELINE.code,
+) {
   if (FORCE_IV1 && FORCE_IV2) {
     return { iv1: FORCE_IV1, iv2: FORCE_IV2 };
   }
@@ -254,6 +262,7 @@ export async function assignIV(query: Record<string, QueryValue> = {}) {
     const pickedPair = await pickBalancedIvPair(
       PIPELINE.assign.iv1.values,
       PIPELINE.assign.iv2.values,
+      pipelineCode,
     );
 
     return {
@@ -264,18 +273,20 @@ export async function assignIV(query: Record<string, QueryValue> = {}) {
 
   const [iv1, iv2] = await Promise.all([
     requestedIv1
-      ? Promise.resolve(requestedIv1)
-      : pickBalancedValue(
+        ? Promise.resolve(requestedIv1)
+        : pickBalancedValue(
           "iv1",
           PIPELINE.assign.iv1.mode,
           PIPELINE.assign.iv1.values,
+          pipelineCode,
         ),
     requestedIv2
-      ? Promise.resolve(requestedIv2)
-      : pickBalancedValue(
+        ? Promise.resolve(requestedIv2)
+        : pickBalancedValue(
           "iv2",
           PIPELINE.assign.iv2.mode,
           PIPELINE.assign.iv2.values,
+          pipelineCode,
         ),
   ]);
 
@@ -287,6 +298,7 @@ async function pickVariant(
   query: Record<string, QueryValue>,
   stratifyBy: StratifyBy,
   progress: Partial<ProgressRecord>,
+  pipelineCode: string,
 ) {
   const { variant } = stage;
   const allVariants = variant.value;
@@ -322,7 +334,7 @@ async function pickVariant(
   }
 
   if (variant.mode === "balanced") {
-    return balancedPick(stage.id, allVariants, stratifyBy);
+    return balancedPick(stage.id, allVariants, stratifyBy, pipelineCode);
   }
 
   throw new Error(`Unknown variant mode: ${variant.mode}`);
@@ -333,6 +345,7 @@ export async function resolveAllVariants(
   existingVariants: Record<string, string> = {},
   query: Record<string, QueryValue> = {},
   progress: Partial<ProgressRecord> = {},
+  pipelineCode: string = PIPELINE.code,
 ) {
   const supabase = getSupabaseAdmin();
   const stageVariants = { ...existingVariants };
@@ -378,6 +391,7 @@ export async function resolveAllVariants(
       query,
       stratifyBy,
       progress,
+      pipelineCode,
     );
   }
 
@@ -387,7 +401,7 @@ export async function resolveAllVariants(
       stage_variants: stageVariants,
       updated_at: nowIso(),
     } satisfies JsonObject)
-    .eq("pipeline_code", PIPELINE.code)
+    .eq("pipeline_code", pipelineCode)
     .eq("prolific_id", prolificId);
 
   if (error) {

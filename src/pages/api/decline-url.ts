@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 
-import { PROLIFIC_NOCONSENT_URL } from "@/lib/pipeline";
+import { getProlificSettings } from "@/lib/prolific-settings";
 import type { ApiErrorResponse } from "@/lib/types";
 
 type DeclineResponse = {
@@ -8,7 +8,7 @@ type DeclineResponse = {
   redirectUrl: string;
 };
 
-export default function handler(
+export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<DeclineResponse | ApiErrorResponse>,
 ) {
@@ -18,9 +18,11 @@ export default function handler(
       return res.status(405).json({ ok: false, message: "Method not allowed" });
     }
 
+    const settings = await getProlificSettings();
+
     return res.json({
       ok: true,
-      redirectUrl: PROLIFIC_NOCONSENT_URL,
+      redirectUrl: settings.noconsentUrl,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

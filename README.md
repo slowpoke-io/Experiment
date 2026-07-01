@@ -2,6 +2,10 @@
 
 這是一個用 `Next.js Pages Router` 實作的實驗網站。受試者從 Prolific 進站後，會先閱讀 informed consent，再依照固定的 7 個 stage 完成前測、情境閱讀、影片、互動、後測。前後端都在同一個 repo，資料由 server-side Supabase service role 寫入。
 
+正式站點：
+
+- [ai-workplace-assistant.nblab.im.ntu.edu.tw](https://ai-workplace-assistant.nblab.im.ntu.edu.tw/)
+
 目前的 pipeline code 是 `study_v1`，核心操弄是 `iv1` 與 `iv2` 兩個二元變項，兩者都用 balanced assignment 指派：
 
 - `iv1`: 控制 `stage_4` 的 `System Notice` 文案。
@@ -38,6 +42,7 @@
 - 呈現方式：先用固定 seed shuffle，再切成每頁 1 個 group
 - 驗證：`attention_checks`
 - 目前有 1 題 attention check
+  - 欄位：`SCS_ATTN_1`
 
 #### Stage 2: Scenario Introduction
 
@@ -52,6 +57,7 @@
 - section：`pre_ai_evaluation`
 - 驗證：`attention_checks`
 - 目前有 1 題 attention check
+  - 欄位：`PRE_AI_ATTN_1`
 
 #### Stage 4: System Notice
 
@@ -99,6 +105,10 @@
   - `post_ai_evaluation`
   - `post_experience_outcomes`
   - `post_failure_reactions`
+  - 欄位：
+    - `POST_AI_ATTN_1`
+    - `POST_EXPERIENCE_ATTN_1`
+    - `POST_FAILURE_ATTN_1`
 
 ### Completion, Failure, Timeout
 
@@ -139,6 +149,12 @@
 - `stage_5`: `placeholder_validator`
 - `stage_6`: `placeholder_validator`
 - `stage_7`: `attention_checks`
+
+Attention check 對應欄位：
+
+- `stage_1`: `SCS_ATTN_1`
+- `stage_3`: `PRE_AI_ATTN_1`
+- `stage_7`: `POST_AI_ATTN_1`, `POST_EXPERIENCE_ATTN_1`, `POST_FAILURE_ATTN_1`
 
 ## Data Model
 

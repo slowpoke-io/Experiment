@@ -223,10 +223,10 @@ function buildManipulation1ChartData(rows: AdminStatsParticipantRow[]) {
   return ["yes", "no", "dont_recall"].map((optionKey) => ({
     option: normalizeManipulationChoiceLabel(optionKey),
     A: rows.filter(
-      (row) => row.iv1 === "A" && row.response_values["stage_7.MANIPULATION_IV1"] === optionKey,
+      (row) => row.iv1 === "A" && row.response_values["post_questionnaire.MANIPULATION_IV1"] === optionKey,
     ).length,
     B: rows.filter(
-      (row) => row.iv1 === "B" && row.response_values["stage_7.MANIPULATION_IV1"] === optionKey,
+      (row) => row.iv1 === "B" && row.response_values["post_questionnaire.MANIPULATION_IV1"] === optionKey,
     ).length,
   }));
 }
@@ -237,7 +237,7 @@ function buildSheetRows(rows: AdminStatsParticipantRow[]): SheetRow[] {
     prolific_id: row.prolific_id,
     iv1: row.iv1,
     iv2: row.iv2,
-    manipulation1: normalizeManipulationChoiceLabel(row.response_values["stage_7.MANIPULATION_IV1"]),
+    manipulation1: normalizeManipulationChoiceLabel(row.response_values["post_questionnaire.MANIPULATION_IV1"]),
     manipulation2:
       typeof row.construct_averages.MANIPULATION_IV2 === "number"
         ? row.construct_averages.MANIPULATION_IV2
@@ -245,7 +245,7 @@ function buildSheetRows(rows: AdminStatsParticipantRow[]): SheetRow[] {
     feedback_content_flag: hasNonEmptyString(row.response_values["stage_6.FEEDBACK_CONTENT"])
       ? "Has"
       : "No",
-    feedback_reason_flag: hasNonEmptyString(row.response_values["stage_7.FEEDBACK_REASON"])
+    feedback_reason_flag: hasNonEmptyString(row.response_values["post_questionnaire.FEEDBACK_REASON"])
       ? "Has"
       : "No",
     __source: row,
@@ -415,10 +415,10 @@ function Manipulation1Chart({ rows }: { rows: AdminStatsParticipantRow[] }) {
 
   // IV1 A correct = "no", IV1 B correct = "yes"
   const correctA = rows.filter(
-    (r) => r.iv1 === "A" && r.response_values["stage_7.MANIPULATION_IV1"] === MANIPULATION1_CORRECT.A,
+    (r) => r.iv1 === "A" && r.response_values["post_questionnaire.MANIPULATION_IV1"] === MANIPULATION1_CORRECT.A,
   ).length;
   const correctB = rows.filter(
-    (r) => r.iv1 === "B" && r.response_values["stage_7.MANIPULATION_IV1"] === MANIPULATION1_CORRECT.B,
+    (r) => r.iv1 === "B" && r.response_values["post_questionnaire.MANIPULATION_IV1"] === MANIPULATION1_CORRECT.B,
   ).length;
 
   return (
@@ -660,7 +660,7 @@ function IncorrectRespondersPanel({
   const [expanded, setExpanded] = useState(true);
 
   const incorrectRows = rows.filter((row) => {
-    const answer = row.response_values["stage_7.MANIPULATION_IV1"];
+    const answer = row.response_values["post_questionnaire.MANIPULATION_IV1"];
     return answer !== MANIPULATION1_CORRECT[row.iv1];
   });
 
@@ -746,7 +746,7 @@ function IncorrectRespondersPanel({
               <tbody>
                 {incorrectRows.map((row) => {
                   const answer = normalizeManipulationChoiceLabel(
-                    row.response_values["stage_7.MANIPULATION_IV1"],
+                    row.response_values["post_questionnaire.MANIPULATION_IV1"],
                   );
                   const expected = normalizeManipulationChoiceLabel(
                     MANIPULATION1_CORRECT[row.iv1],
@@ -823,7 +823,7 @@ function IncorrectRespondersManip1And2Panel({
   const [expanded, setExpanded] = useState(true);
 
   const incorrectRows = rows.filter((row) => {
-    const m1Wrong = row.response_values["stage_7.MANIPULATION_IV1"] !== MANIPULATION1_CORRECT[row.iv1];
+    const m1Wrong = row.response_values["post_questionnaire.MANIPULATION_IV1"] !== MANIPULATION1_CORRECT[row.iv1];
     const m2 = row.construct_averages.MANIPULATION_IV2;
     const m2Wrong =
       typeof m2 === "number" &&
@@ -904,7 +904,7 @@ function IncorrectRespondersManip1And2Panel({
               <tbody>
                 {incorrectRows.map((row) => {
                   const m1Answer = normalizeManipulationChoiceLabel(
-                    row.response_values["stage_7.MANIPULATION_IV1"],
+                    row.response_values["post_questionnaire.MANIPULATION_IV1"],
                   );
                   const m1Expected = normalizeManipulationChoiceLabel(MANIPULATION1_CORRECT[row.iv1]);
                   const m2 = row.construct_averages.MANIPULATION_IV2 as number;
@@ -1377,7 +1377,7 @@ export function AdminStatsDashboard({ initialData, onLogout }: AdminStatsDashboa
         setDetailState,
         args.row.prolific_id,
         "Feedback Reason",
-        args.row.__source.response_values["stage_7.FEEDBACK_REASON"],
+        args.row.__source.response_values["post_questionnaire.FEEDBACK_REASON"],
       );
       return;
     }

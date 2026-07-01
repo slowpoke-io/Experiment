@@ -390,6 +390,7 @@ function buildStatsParticipantRow(
     completed: row.completed,
     failed: row.failed,
     failed_stage_id: row.failed_stage_id,
+    failed_reason: row.failed_reason,
     current_stage_index: row.current_stage_index,
     submission_count: row.submission_count,
     last_submission_stage_id: row.last_submission_stage_id,
@@ -402,13 +403,19 @@ function buildStatsParticipantRow(
   };
 }
 
-export async function fetchAdminStatistics(): Promise<AdminStatisticsResponse> {
+export async function fetchAdminStatistics(
+  pipelineCode: string | string[] = PIPELINE.code,
+): Promise<AdminStatisticsResponse> {
   const supabase = getSupabaseAdmin();
-  const result = await supabase
+  const pipelineCodes = Array.isArray(pipelineCode) ? pipelineCode : [pipelineCode];
+  const query = supabase
     .from("admin_participant_detail")
     .select("*")
-    .eq("pipeline_code", PIPELINE.code)
     .order("updated_at", { ascending: false });
+  const result =
+    pipelineCodes.length === 1
+      ? await query.eq("pipeline_code", pipelineCodes[0])
+      : await query.in("pipeline_code", pipelineCodes);
 
   if (result.error) {
     throw result.error;
