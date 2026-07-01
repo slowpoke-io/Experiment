@@ -345,9 +345,11 @@ function buildAnswerGroups(row: AdminStatsParticipantRow) {
 function buildResultsRows(stats: AdminStatisticsResponse): FollowUpResultRow[] {
   return stats.rows.map((row) => {
     const feedbackContent =
-      typeof row.response_values["stage_6.FEEDBACK_CONTENT"] === "string"
-        ? String(row.response_values["stage_6.FEEDBACK_CONTENT"])
-        : "";
+      typeof row.response_values["popup.FEEDBACK_CONTENT"] === "string"
+        ? String(row.response_values["popup.FEEDBACK_CONTENT"])
+        : typeof row.response_values["stage_6.FEEDBACK_CONTENT"] === "string"
+          ? String(row.response_values["stage_6.FEEDBACK_CONTENT"])
+          : "";
     const feedbackReason =
       typeof row.response_values["post_questionnaire.FEEDBACK_REASON"] === "string"
         ? String(row.response_values["post_questionnaire.FEEDBACK_REASON"])

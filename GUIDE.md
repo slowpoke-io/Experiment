@@ -9,11 +9,11 @@
 ## 1. 入口
 
 - 管理頁入口：`https://ai-workplace-assistant.nblab.im.ntu.edu.tw/follow-up`
-- 登入密碼: `ntuim1114drH0ot`
+- 登入密碼: `c12568`
 
 ## 2. 給受試者的 Study URL
 
-要放到 Prolific，URL使用：
+放到 Prolific的URL使用：
 
 ```text
 https://ai-workplace-assistant.nblab.im.ntu.edu.tw/?prolific_id={{%PROLIFIC_PID%}}
@@ -28,11 +28,11 @@ https://ai-workplace-assistant.nblab.im.ntu.edu.tw/?prolific_id={{%PROLIFIC_PID%
 - `Pipeline code`
   - 這一批實驗資料的 id，可用來區分不同批次的實驗。
 - `Complete code`
-  - 受試者成功完成後回傳 Prolific 的 code。
+  - 受試者成功完成後對應 Prolific 的 code。
 - `Fail code`
-  - 受試者失敗時回傳 Prolific 的 code。
+  - 受試者失敗時對應 Prolific 的 code (Failed attention check)。
 - `No-consent code`
-  - 受試者不同意 consent 時回傳 Prolific 的 code。
+  - 受試者不同意 consent 時對應 Prolific 的 code (No consent)。
 - `Study open`
   - 開啟：新受試者可以進入 study。
   - 關閉：新受試者不能開始 study。
@@ -93,7 +93,7 @@ CSV 匯出時，`A / B` 會轉成 `0 / 1`：
 
 ## 6. Pipeline 使用方式
 
-如果之後有不同批次或不同 follow-up wave：
+如果之後有不同批次的實驗：
 
 1. 先到 `Settings`
 2. 修改 `Pipeline code`
