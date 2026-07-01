@@ -273,6 +273,20 @@ function escapeCsvCell(value: unknown) {
   return formatted;
 }
 
+function normalizeExportValue(header: string, value: unknown) {
+  if (header === "FEEDBACK_DECISION") {
+    if (value === "yes") {
+      return 1;
+    }
+
+    if (value === "no") {
+      return 0;
+    }
+  }
+
+  return value;
+}
+
 function buildAliasAverageValue(
   row: AdminStatsParticipantRow,
   sourceKeys: string[],
@@ -619,18 +633,25 @@ export function buildFollowUpExportCsv(
     scopedColumns
       .map((column) => {
         if (column.kind === "meta") {
-          return escapeCsvCell(column.value(row));
+          return escapeCsvCell(normalizeExportValue(column.header, column.value(row)));
         }
 
         if (column.kind === "average") {
-          return escapeCsvCell(row.construct_averages[column.constructId] ?? null);
+          return escapeCsvCell(
+            normalizeExportValue(
+              column.header,
+              row.construct_averages[column.constructId] ?? null,
+            ),
+          );
         }
 
         if (column.kind === "computed") {
-          return escapeCsvCell(column.value(row));
+          return escapeCsvCell(normalizeExportValue(column.header, column.value(row)));
         }
 
-        return escapeCsvCell(row.response_values[column.key]);
+        return escapeCsvCell(
+          normalizeExportValue(column.header, row.response_values[column.key]),
+        );
       })
       .join(","),
   );
