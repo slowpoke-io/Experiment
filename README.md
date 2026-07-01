@@ -42,6 +42,7 @@
 - 呈現方式：先用固定 seed shuffle，再切成每頁 1 個 group
 - 驗證：`attention_checks`
 - 目前有 1 題 attention check
+  - 欄位：`SCS_ATTN_1`
 
 #### Stage 2: Scenario Introduction
 
@@ -56,6 +57,7 @@
 - section：`pre_ai_evaluation`
 - 驗證：`attention_checks`
 - 目前有 1 題 attention check
+  - 欄位：`PRE_AI_ATTN_1`
 
 #### Stage 4: System Notice
 
@@ -103,6 +105,10 @@
   - `post_ai_evaluation`
   - `post_experience_outcomes`
   - `post_failure_reactions`
+  - 欄位：
+    - `POST_AI_ATTN_1`
+    - `POST_EXPERIENCE_ATTN_1`
+    - `POST_FAILURE_ATTN_1`
 
 ### Completion, Failure, Timeout
 
@@ -143,6 +149,12 @@
 - `stage_5`: `placeholder_validator`
 - `stage_6`: `placeholder_validator`
 - `stage_7`: `attention_checks`
+
+Attention check 對應欄位：
+
+- `stage_1`: `SCS_ATTN_1`
+- `stage_3`: `PRE_AI_ATTN_1`
+- `stage_7`: `POST_AI_ATTN_1`, `POST_EXPERIENCE_ATTN_1`, `POST_FAILURE_ATTN_1`
 
 ## Data Model
 

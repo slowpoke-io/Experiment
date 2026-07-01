@@ -18,118 +18,118 @@ const SAMPLE_EXPORT_SEQUENCE = [
   "MANIPULATION_IV2",
   "FEEDBACK_DECISION",
   "AI_FAMILIARITY_1",
+  "AVG_DISPOSITION_TO_TRUST_TECHNOLOGY",
   "DISPOSITION_TO_TRUST_TECHNOLOGY_1",
   "DISPOSITION_TO_TRUST_TECHNOLOGY_2",
   "DISPOSITION_TO_TRUST_TECHNOLOGY_3",
-  "AVG_DISPOSITION_TO_TRUST_TECHNOLOGY",
+  "AVG_PRE_ABILITY",
   "PRE_ABILITY_1",
   "PRE_ABILITY_2",
   "PRE_ABILITY_3",
   "PRE_ABILITY_4",
-  "AVG_PRE_ABILITY",
+  "AVG_PRE_COGNITIVE_TRUST",
   "PRE_COGNITIVE_TRUST_1",
   "PRE_COGNITIVE_TRUST_2",
   "PRE_COGNITIVE_TRUST_3",
   "PRE_COGNITIVE_TRUST_4",
-  "AVG_PRE_COGNITIVE_TRUST",
+  "AVG_POST_ABILITY",
   "POST_ABILITY_1",
   "POST_ABILITY_2",
   "POST_ABILITY_3",
   "POST_ABILITY_4",
-  "AVG_POST_ABILITY",
+  "AVG_POST_COGNITIVE_TRUST",
   "POST_COGNITIVE_TRUST_1",
   "POST_COGNITIVE_TRUST_2",
   "POST_COGNITIVE_TRUST_3",
   "POST_COGNITIVE_TRUST_4",
-  "AVG_POST_COGNITIVE_TRUST",
+  "AVG_PRE_BENEVOLENCE",
   "PRE_BENEVOLENCE_1",
   "PRE_BENEVOLENCE_2",
   "PRE_BENEVOLENCE_3",
-  "AVG_PRE_BENEVOLENCE",
+  "AVG_PRE_INTEGRITY",
   "PRE_INTEGRITY_1",
   "PRE_INTEGRITY_2",
   "PRE_INTEGRITY_3",
-  "AVG_PRE_INTEGRITY",
-  "PRE_AFFECTIVE_TRUST_1",
-  "PRE_AFFECTIVE_TRUST_4",
-  "PRE_AFFECTIVE_TRUST_2",
-  "PRE_AFFECTIVE_TRUST_5",
-  "PRE_AFFECTIVE_TRUST_3",
-  "PRE_AFFECTIVE_TRUST_6",
   "AVG_PRE_AFFECTIVE_TRUST",
+  "PRE_AFFECTIVE_TRUST_1",
+  "PRE_AFFECTIVE_TRUST_2",
+  "PRE_AFFECTIVE_TRUST_3",
+  "PRE_AFFECTIVE_TRUST_4",
+  "PRE_AFFECTIVE_TRUST_5",
+  "PRE_AFFECTIVE_TRUST_6",
+  "AVG_POST_BENEVOLENCE",
   "POST_BENEVOLENCE_1",
   "POST_BENEVOLENCE_2",
   "POST_BENEVOLENCE_3",
-  "AVG_POST_BENEVOLENCE",
+  "AVG_POST_INTEGRITY",
   "POST_INTEGRITY_1",
   "POST_INTEGRITY_2",
   "POST_INTEGRITY_3",
-  "AVG_POST_INTEGRITY",
-  "POST_AFFECTIVE_TRUST_1",
-  "POST_AFFECTIVE_TRUST_4",
-  "POST_AFFECTIVE_TRUST_2",
-  "POST_AFFECTIVE_TRUST_5",
-  "POST_AFFECTIVE_TRUST_3",
-  "POST_AFFECTIVE_TRUST_6",
   "AVG_POST_AFFECTIVE_TRUST",
+  "POST_AFFECTIVE_TRUST_1",
+  "POST_AFFECTIVE_TRUST_2",
+  "POST_AFFECTIVE_TRUST_3",
+  "POST_AFFECTIVE_TRUST_4",
+  "POST_AFFECTIVE_TRUST_5",
+  "POST_AFFECTIVE_TRUST_6",
+  "AVG_PRE_COMPETENCE",
   "PRE_COMPETENCE_1",
   "PRE_COMPETENCE_2",
   "PRE_COMPETENCE_3",
   "PRE_COMPETENCE_4",
   "PRE_COMPETENCE_5",
   "PRE_COMPETENCE_6",
-  "AVG_PRE_COMPETENCE",
+  "AVG_POST_COMPETENCE",
   "POST_COMPETENCE_1",
   "POST_COMPETENCE_2",
   "POST_COMPETENCE_3",
   "POST_COMPETENCE_4",
   "POST_COMPETENCE_5",
   "POST_COMPETENCE_6",
-  "AVG_POST_COMPETENCE",
+  "AVG_PRE_ATTITUDE",
   "PRE_ATTITUDE_1",
   "PRE_ATTITUDE_2",
   "PRE_ATTITUDE_3",
   "PRE_ATTITUDE_4",
-  "AVG_PRE_ATTITUDE",
+  "AVG_POST_ATTITUDE",
   "POST_ATTITUDE_1",
   "POST_ATTITUDE_2",
   "POST_ATTITUDE_3",
   "POST_ATTITUDE_4",
-  "AVG_POST_ATTITUDE",
+  "AVG_FRUSTRATION",
   "FRUSTRATION_1",
   "FRUSTRATION_2",
   "FRUSTRATION_3",
-  "AVG_FRUSTRATION",
+  "AVG_FORGIVENESS",
   "FORGIVENESS_1",
   "FORGIVENESS_2",
   "FORGIVENESS_3",
   "FORGIVENESS_4",
-  "AVG_FORGIVENESS",
+  "AVG_SERVICE_FAILURE_SEVERITY",
   "SERVICE_FAILURE_SEVERITY_1",
   "SERVICE_FAILURE_SEVERITY_2",
   "SERVICE_FAILURE_SEVERITY_3",
-  "AVG_SERVICE_FAILURE_SEVERITY",
+  "AVG_CONFIRMATION_OF_EXPECTATIONS",
   "CONFIRMATION_OF_EXPECTATIONS_1",
   "CONFIRMATION_OF_EXPECTATIONS_2",
   "CONFIRMATION_OF_EXPECTATIONS_3",
   "CONFIRMATION_OF_EXPECTATIONS_4",
-  "AVG_CONFIRMATION_OF_EXPECTATIONS",
+  "AVG_PERCEIVED_USEFULNESS",
   "PERCEIVED_USEFULNESS_1",
   "PERCEIVED_USEFULNESS_2",
   "PERCEIVED_USEFULNESS_3",
   "PERCEIVED_USEFULNESS_4",
   "PERCEIVED_USEFULNESS_5",
   "PERCEIVED_USEFULNESS_6",
-  "AVG_PERCEIVED_USEFULNESS",
+  "AVG_SATISFACTION",
   "SATISFACTION_1",
   "SATISFACTION_2",
   "SATISFACTION_3",
   "SATISFACTION_4",
-  "AVG_SATISFACTION",
+  "AVG_CONTINUANCE_INTENTION",
   "CONTINUANCE_INTENTION_1",
   "CONTINUANCE_INTENTION_2",
   "CONTINUANCE_INTENTION_3",
-  "AVG_CONTINUANCE_INTENTION",
   "FEEDBACK_CONTENT",
   "FEEDBACK_REASON",
 ] as const;
@@ -356,6 +356,24 @@ function buildAnswerGroups(row: AdminStatsParticipantRow) {
   }));
 }
 
+function sortQuestionColumnKeys(keys: string[]) {
+  return [...keys].sort((left, right) => {
+    const leftMatch = left.match(/_(\d+)$/);
+    const rightMatch = right.match(/_(\d+)$/);
+
+    if (leftMatch && rightMatch) {
+      const leftNumber = Number(leftMatch[1]);
+      const rightNumber = Number(rightMatch[1]);
+
+      if (leftNumber !== rightNumber) {
+        return leftNumber - rightNumber;
+      }
+    }
+
+    return left.localeCompare(right);
+  });
+}
+
 function buildResultsRows(stats: AdminStatisticsResponse): FollowUpResultRow[] {
   return stats.rows.map((row) => {
     const feedbackContent =
@@ -459,7 +477,16 @@ function addConstructColumns(
   emittedResponseKeys: Set<string>,
   emittedConstructIds: Set<string>,
 ) {
-  for (const questionKey of construct.questionColumnKeys) {
+  if (!emittedConstructIds.has(construct.id)) {
+    exportColumns.push({
+      kind: "average",
+      header: `AVG_${construct.id}`,
+      constructId: construct.id,
+    });
+    emittedConstructIds.add(construct.id);
+  }
+
+  for (const questionKey of sortQuestionColumnKeys(construct.questionColumnKeys)) {
     if (emittedResponseKeys.has(questionKey)) {
       continue;
     }
@@ -475,15 +502,6 @@ function addConstructColumns(
       key: questionColumn.key,
     });
     emittedResponseKeys.add(questionColumn.key);
-  }
-
-  if (!emittedConstructIds.has(construct.id)) {
-    exportColumns.push({
-      kind: "average",
-      header: `AVG_${construct.id}`,
-      constructId: construct.id,
-    });
-    emittedConstructIds.add(construct.id);
   }
 }
 
@@ -519,6 +537,16 @@ function buildExportColumns(stats: AdminStatisticsResponse): ExportColumn[] {
       continue;
     }
 
+    const aliasAverageKeys = EXPORT_ALIAS_AVERAGE_KEYS[header];
+    if (aliasAverageKeys) {
+      exportColumns.push({
+        kind: "computed",
+        header,
+        value: (row) => buildAliasAverageValue(row, aliasAverageKeys),
+      });
+      continue;
+    }
+
     if (header.startsWith("AVG_")) {
       const construct = constructByAverageHeader.get(header);
       if (construct && !emittedConstructIds.has(construct.id)) {
@@ -529,16 +557,6 @@ function buildExportColumns(stats: AdminStatisticsResponse): ExportColumn[] {
         });
         emittedConstructIds.add(construct.id);
       }
-      continue;
-    }
-
-    const aliasAverageKeys = EXPORT_ALIAS_AVERAGE_KEYS[header];
-    if (aliasAverageKeys) {
-      exportColumns.push({
-        kind: "computed",
-        header,
-        value: (row) => buildAliasAverageValue(row, aliasAverageKeys),
-      });
       continue;
     }
 
