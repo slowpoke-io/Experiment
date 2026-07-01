@@ -635,6 +635,11 @@ export function buildFollowUpExportCsv(
           header: "pipeline_code",
           value: (row: AdminStatsParticipantRow) => row.pipeline_code,
         },
+        {
+          kind: "meta" as const,
+          header: "total_seconds",
+          value: (row: AdminStatsParticipantRow) => row.total_seconds,
+        },
         ...columns.slice(1),
       ]
       : [
@@ -643,6 +648,11 @@ export function buildFollowUpExportCsv(
           kind: "meta" as const,
           header: "pipeline_code",
           value: (row: AdminStatsParticipantRow) => row.pipeline_code,
+        },
+        {
+          kind: "meta" as const,
+          header: "total_seconds",
+          value: (row: AdminStatsParticipantRow) => row.total_seconds,
         },
         ...columns.slice(1),
       ];
